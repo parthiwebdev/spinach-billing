@@ -1,0 +1,15 @@
+/* Font Variables - Clash Display loaded via layout.js, Instrument Sans via next/font */
+:root {
+  --font-heading: 'Clash Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-body: var(--font-instrument-sans), 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Apply body font globally */
+body {
+  font-family: var(--font-body) !important;
+}
+
+/* Apply heading font to all headings */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading) !important;
+}
