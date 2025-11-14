@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import Link from 'next/link';
 import {
   BottomNavigation,
   BottomNavigationAction,
@@ -37,28 +38,8 @@ const BottomNav = () => {
     setValue(navValue);
   }, [pathname]);
 
-  const handleChange = (_event, newValue) => {
-    setValue(newValue);
-
-    switch (newValue) {
-      case 0:
-        router.push('/');
-        break;
-      case 1:
-        router.push('/products');
-        break;
-      case 2:
-        router.push('/customers');
-        break;
-      case 3:
-        router.push('/orders');
-        break;
-      case 4:
-        router.push('/settings');
-        break;
-      default:
-        router.push('/');
-    }
+  const handleNavigation = (path) => {
+    router.push(path);
   };
 
   return (
@@ -75,7 +56,7 @@ const BottomNav = () => {
       <Paper elevation={8}>
         <BottomNavigation
           value={value}
-          onChange={handleChange}
+          onChange={(_event, newValue) => setValue(newValue)}
           showLabels
           sx={{
             height: 65,
@@ -88,11 +69,31 @@ const BottomNav = () => {
             },
           }}
         >
-          <BottomNavigationAction label="Home" icon={<HomeIcon />} />
-          <BottomNavigationAction label="Products" icon={<ProductsIcon />} />
-          <BottomNavigationAction label="Customers" icon={<CustomersIcon />} />
-          <BottomNavigationAction label="Orders" icon={<OrdersIcon />} />
-          <BottomNavigationAction label="Settings" icon={<SettingsIcon />} />
+          <BottomNavigationAction
+            label="Home"
+            icon={<HomeIcon />}
+            onClick={() => handleNavigation('/')}
+          />
+          <BottomNavigationAction
+            label="Products"
+            icon={<ProductsIcon />}
+            onClick={() => handleNavigation('/products')}
+          />
+          <BottomNavigationAction
+            label="Customers"
+            icon={<CustomersIcon />}
+            onClick={() => handleNavigation('/customers')}
+          />
+          <BottomNavigationAction
+            label="Orders"
+            icon={<OrdersIcon />}
+            onClick={() => handleNavigation('/orders')}
+          />
+          <BottomNavigationAction
+            label="Settings"
+            icon={<SettingsIcon />}
+            onClick={() => handleNavigation('/settings')}
+          />
         </BottomNavigation>
       </Paper>
     </Box>
