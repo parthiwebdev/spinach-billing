@@ -21,6 +21,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Skeleton,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -28,19 +29,22 @@ import {
   Receipt as ReceiptIcon,
   ShoppingCart as CartIcon,
 } from '@mui/icons-material';
-import { selectAllCustomers, addOrUpdateCustomer } from '../../store/slices/customersSlice';
-import { createOrder } from '../../store/slices/ordersSlice';
+import { selectAllCustomers, selectCustomersSynced } from '../../store/slices/customersSlice';
+import { createOrderWithBalance, selectOrdersLoading } from '../../store/slices/ordersSlice';
 import { spinachProducts } from '../../data/spinachProducts';
 
 export default function CreateOrder() {
   const dispatch = useDispatch();
   const router = useRouter();
   const customers = useSelector(selectAllCustomers);
+  const loading = useSelector(selectOrdersLoading);
+  const customersSynced = useSelector(selectCustomersSynced);
+
+  const isLoadingCustomers = !customersSynced;
 
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [productQuantities, setProductQuantities] = useState({});
 
-  const TAX_RATE = 0.1; // 10% tax
   const SHIPPING_FEE = 5.99;
 
   // Get order items from product quantities
@@ -57,8 +61,7 @@ export default function CreateOrder() {
 
   // Calculate totals
   const subtotal = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const tax = subtotal * TAX_RATE;
-  const total = subtotal + tax + SHIPPING_FEE;
+  const total = subtotal + SHIPPING_FEE;
 
   // Handle quantity change
   const handleQuantityChange = (productId, change) => {
@@ -79,50 +82,43 @@ export default function CreateOrder() {
   };
 
   // Create order
-  const handleCreateOrder = () => {
+  const handleCreateOrder = async () => {
     if (!selectedCustomer || orderItems.length === 0) return;
 
-    const orderDate = new Date().toISOString();
-    const orderId = Date.now().toString();
+    try {
+      // Build customerInfo, filtering out undefined values
+      const customerInfo = {
+        name: selectedCustomer.name,
+        phone: selectedCustomer.phone,
+      };
+      if (selectedCustomer.email) customerInfo.email = selectedCustomer.email;
+      if (selectedCustomer.address) customerInfo.address = selectedCustomer.address;
+      if (selectedCustomer.city) customerInfo.city = selectedCustomer.city;
+      if (selectedCustomer.zipCode) customerInfo.zipCode = selectedCustomer.zipCode;
 
-    // Create order
-    dispatch(
-      createOrder({
-        customerInfo: {
-          name: selectedCustomer.name,
-          email: selectedCustomer.email,
-          phone: selectedCustomer.phone,
-          address: selectedCustomer.address,
-          city: selectedCustomer.city,
-          zipCode: selectedCustomer.zipCode,
-        },
+      // Create order with Firebase
+      const orderData = {
+        customerInfo,
         items: orderItems,
         subtotal,
-        tax,
         shipping: SHIPPING_FEE,
         total,
-      })
-    );
+      };
 
-    // Update customer with order information
-    dispatch(
-      addOrUpdateCustomer({
-        customerInfo: {
-          name: selectedCustomer.name,
-          email: selectedCustomer.email,
-          phone: selectedCustomer.phone,
-          address: selectedCustomer.address,
-          city: selectedCustomer.city,
-          zipCode: selectedCustomer.zipCode,
-        },
-        orderId,
-        orderTotal: total,
-        orderDate,
-      })
-    );
+      // Use createOrderWithBalance which calls Firebase
+      const order = await dispatch(
+        createOrderWithBalance(
+          orderData,
+          selectedCustomer.id,
+          selectedCustomer.pendingBalance || 0
+        )
+      );
 
-    // Navigate to order detail
-    router.push('/orders/latest');
+      // Navigate to order detail
+      router.push(`/orders/${order.id}`);
+    } catch (error) {
+      console.error('Error creating order:', error);
+    }
   };
 
   return (
@@ -147,22 +143,26 @@ export default function CreateOrder() {
           <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, mb: 2 }}>
             Select Customer
           </Typography>
-          <Autocomplete
-            value={selectedCustomer}
-            onChange={(event, newValue) => setSelectedCustomer(newValue)}
-            options={customers}
-            getOptionLabel={(option) =>
-              `${option.name} - ${option.phone.replace(/^\(\d{3}\)\s/, '')}`
-            }
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Customer"
-                placeholder="Search by name or phone"
-              />
-            )}
-            fullWidth
-          />
+          {isLoadingCustomers ? (
+            <Skeleton variant="rounded" height={56} />
+          ) : (
+            <Autocomplete
+              value={selectedCustomer}
+              onChange={(event, newValue) => setSelectedCustomer(newValue)}
+              options={customers}
+              getOptionLabel={(option) =>
+                `${option.name} - ${option.phone.replace(/^\(\d{3}\)\s/, '')}`
+              }
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Customer"
+                  placeholder="Search by name or phone"
+                />
+              )}
+              fullWidth
+            />
+          )}
 
           {selectedCustomer && (
             <Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
@@ -391,9 +391,9 @@ export default function CreateOrder() {
               {orderItems.length > 0 ? (
                 <>
                   <Box sx={{ mb: 2 }}>
-                    {orderItems.map((item) => (
+                    {orderItems.map((item, index) => (
                       <Box
-                        key={item.productId}
+                        key={index}
                         sx={{
                           display: 'flex',
                           justifyContent: 'space-between',
@@ -432,11 +432,6 @@ export default function CreateOrder() {
                     <Typography variant="body1">₹{subtotal.toFixed(2)}</Typography>
                   </Box>
 
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body1">Tax (10%)</Typography>
-                    <Typography variant="body1">₹{tax.toFixed(2)}</Typography>
-                  </Box>
-
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                     <Typography variant="body1">Shipping</Typography>
                     <Typography variant="body1">₹{SHIPPING_FEE.toFixed(2)}</Typography>
@@ -466,10 +461,10 @@ export default function CreateOrder() {
                 size="large"
                 fullWidth
                 onClick={handleCreateOrder}
-                disabled={!selectedCustomer || orderItems.length === 0}
+                disabled={loading || !selectedCustomer || orderItems.length === 0}
                 startIcon={<ReceiptIcon />}
               >
-                Create Order & Generate Bill
+                {loading ? 'Creating Order...' : 'Create Order & Generate Bill'}
               </Button>
 
               {(!selectedCustomer || orderItems.length === 0) && (

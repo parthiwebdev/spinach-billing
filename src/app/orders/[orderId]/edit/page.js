@@ -8,16 +8,17 @@ import {
   Typography,
   Box,
   Paper,
-  Grid,
   TextField,
   Button,
-  Card,
-  CardMedia,
-  CardContent,
   Divider,
   Alert,
   IconButton,
-  Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -26,9 +27,7 @@ import {
   ShoppingCart as CartIcon,
   ArrowBack as BackIcon,
 } from '@mui/icons-material';
-import { selectOrderById } from '../../../../store/slices/ordersSlice';
-import { updateOrder } from '../../../../store/slices/ordersSlice';
-import { addOrUpdateCustomer } from '../../../../store/slices/customersSlice';
+import { selectOrderById, modifyOrder, selectOrdersLoading } from '../../../../store/slices/ordersSlice';
 import { spinachProducts } from '../../../../data/spinachProducts';
 
 export default function EditOrder() {
@@ -38,9 +37,9 @@ export default function EditOrder() {
   const orderId = params.orderId;
 
   const order = useSelector(selectOrderById(orderId));
+  const loading = useSelector(selectOrdersLoading);
   const [productQuantities, setProductQuantities] = useState({});
 
-  const TAX_RATE = 0.1; // 10% tax
   const SHIPPING_FEE = 5.99;
 
   // Initialize quantities from existing order
@@ -83,8 +82,7 @@ export default function EditOrder() {
 
   // Calculate totals
   const subtotal = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const tax = subtotal * TAX_RATE;
-  const total = subtotal + tax + SHIPPING_FEE;
+  const total = subtotal + SHIPPING_FEE;
 
   // Handle quantity change
   const handleQuantityChange = (productId, change) => {
@@ -105,37 +103,25 @@ export default function EditOrder() {
   };
 
   // Update order
-  const handleUpdateOrder = () => {
+  const handleUpdateOrder = async () => {
     if (orderItems.length === 0) return;
 
-    // Update order
-    dispatch(
-      updateOrder({
-        orderId: order.id,
-        items: orderItems,
-        subtotal,
-        tax,
-        shipping: SHIPPING_FEE,
-        total,
-      })
-    );
+    try {
+      // Update order in Firebase
+      await dispatch(
+        modifyOrder(order.id, {
+          items: orderItems,
+          subtotal,
+          shipping: SHIPPING_FEE,
+          total,
+        })
+      );
 
-    // Update customer's total spent (recalculate)
-    const orderDate = order.date;
-    const originalTotal = order.total;
-    const difference = total - originalTotal;
-
-    dispatch(
-      addOrUpdateCustomer({
-        customerInfo: order.customerInfo,
-        orderId: order.id,
-        orderTotal: difference, // This will be added to existing total
-        orderDate,
-      })
-    );
-
-    // Navigate back to order detail
-    router.push(`/orders/${order.id}`);
+      // Navigate back to order detail
+      router.push(`/orders/${order.id}`);
+    } catch (error) {
+      console.error('Error updating order:', error);
+    }
   };
 
   return (
@@ -151,10 +137,10 @@ export default function EditOrder() {
           </Button>
         </Box>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
-          <SaveIcon sx={{ fontSize: 40, mr: 2, color: 'primary.main' }} />
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: { xs: 2, md: 4 }, px: { xs: 1, md: 0 } }}>
+          <SaveIcon sx={{ fontSize: { xs: 32, md: 40 }, mr: 2, color: 'primary.main' }} />
           <Box>
-            <Typography variant="h3" component="h1" sx={{ fontWeight: 700 }}>
+            <Typography variant="h3" component="h1" sx={{ fontWeight: 700, fontSize: { xs: '1.75rem', md: '3rem' } }}>
               Edit Order
             </Typography>
             <Typography variant="body1" color="text.secondary">
@@ -163,142 +149,224 @@ export default function EditOrder() {
           </Box>
         </Box>
 
-        <Grid container spacing={4}>
-          {/* Left Column - Customer Info & Products */}
-          <Grid item xs={12} md={8}>
-            {/* Customer Information */}
-            <Paper sx={{ p: 3, mb: 3 }}>
-              <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, mb: 2 }}>
-                Customer Information
+        {/* Customer Information */}
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, mb: 2 }}>
+            Customer Information
+          </Typography>
+          <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+              {order?.customerInfo?.name}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {order.customerInfo?.phone?.replace(/^\(\d{3}\)\s/, '') || 'No phone'} • {order.customerInfo?.city || 'No city'}
+            </Typography>
+            {order.customerInfo?.address && (
+              <Typography variant="body2" color="text.secondary">
+                {order.customerInfo.address}
               </Typography>
-              <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                  {order.customerInfo.name}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {order.customerInfo.phone.replace(/^\(\d{3}\)\s/, '')} • {order.customerInfo.city}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {order.customerInfo.address}
+            )}
+          </Box>
+        </Paper>
+
+        <div className='row'>
+          <div className="col-md-8 col-12">
+            {/* Products Table */}
+            <Paper sx={{ p: 0, overflow: 'hidden' }}>
+              <Box sx={{ p: 3, pb: 2 }}>
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  Edit Products
                 </Typography>
               </Box>
-            </Paper>
-
-            {/* Products Grid */}
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, mb: 3 }}>
-                Edit Products
-              </Typography>
-              <Grid container spacing={2}>
-                {spinachProducts.map((product) => {
-                  const qty = productQuantities[product.id] || 0;
-                  const itemTotal = product.price * qty;
-
-                  return (
-                    <Grid item xs={12} sm={6} md={4} key={product.id}>
-                      <Card
+              <TableContainer sx={{ overflowX: 'visible' }}>
+                <Table sx={{ width: '100%' }}>
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: 'action.hover' }}>
+                      <TableCell
                         sx={{
-                          height: '100%',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          border: qty > 0 ? 2 : 1,
-                          borderColor: qty > 0 ? 'primary.main' : 'divider',
-                          position: 'relative',
+                          fontWeight: 600,
+                          fontSize: { xs: '0.75rem', md: '0.875rem' },
+                          width: { xs: '50%', sm: '40%' }
                         }}
                       >
-                        {qty > 0 && (
-                          <Chip
-                            label={`${qty} in order`}
-                            color="primary"
-                            size="small"
-                            sx={{
-                              position: 'absolute',
-                              top: 8,
-                              right: 8,
-                              zIndex: 1,
-                            }}
-                          />
-                        )}
-                        <CardMedia
-                          component="img"
-                          height="120"
-                          image={product.image}
-                          alt={product.name}
-                          sx={{ objectFit: 'cover' }}
-                        />
-                        <CardContent sx={{ flexGrow: 1, pb: 1 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                            {product.name}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                            ₹{product.price.toFixed(2)} per {product.unit}
-                          </Typography>
-                          <Chip
-                            label={product.category}
-                            size="small"
-                            sx={{ mb: 1 }}
-                            color={
-                              product.category === 'Fresh'
-                                ? 'success'
-                                : product.category === 'Frozen'
-                                ? 'info'
-                                : 'secondary'
-                            }
-                          />
-
-                          {qty > 0 && (
-                            <Typography variant="caption" color="primary" sx={{ display: 'block', fontWeight: 600 }}>
-                              Subtotal: ₹{itemTotal.toFixed(2)}
-                            </Typography>
-                          )}
-                        </CardContent>
-                        <Box
+                        Product Name
+                      </TableCell>
+                      <TableCell
+                        align="right"
+                        sx={{
+                          fontWeight: 600,
+                          fontSize: { xs: '0.75rem', md: '0.875rem' },
+                          display: { xs: 'none', sm: 'table-cell' },
+                          width: '15%'
+                        }}
+                      >
+                        Price
+                      </TableCell>
+                      <TableCell
+                        align="center"
+                        sx={{
+                          fontWeight: 600,
+                          fontSize: { xs: '0.75rem', md: '0.875rem' },
+                          width: { xs: '50%', sm: '30%' }
+                        }}
+                      >
+                        Quantity
+                      </TableCell>
+                      <TableCell
+                        align="right"
+                        sx={{
+                          fontWeight: 600,
+                          fontSize: { xs: '0.75rem', md: '0.875rem' },
+                          display: { xs: 'none', sm: 'table-cell' },
+                          width: '15%'
+                        }}
+                      >
+                        Subtotal
+                      </TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {spinachProducts.map((product) => {
+                      const qty = productQuantities[product.id] || 0;
+                      const itemTotal = product.price * qty;
+                      return (
+                        <TableRow
+                          key={product.id}
                           sx={{
-                            p: 1,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: 1,
-                            borderTop: 1,
-                            borderColor: 'divider',
+                            bgcolor: qty > 0 ? 'action.selected' : 'inherit',
+                            '&:hover': { bgcolor: 'action.hover' },
                           }}
                         >
-                          <IconButton
-                            size="small"
-                            onClick={() => handleQuantityChange(product.id, -1)}
-                            disabled={qty === 0}
-                            sx={{ bgcolor: 'action.hover' }}
-                          >
-                            <RemoveIcon fontSize="small" />
-                          </IconButton>
-                          <TextField
-                            value={qty}
-                            onChange={(e) => handleQuantityInput(product.id, e.target.value)}
-                            type="number"
-                            inputProps={{
-                              min: 0,
-                              style: { textAlign: 'center', padding: '6px' },
+                          <TableCell sx={{ py: { xs: 1, md: 2 } }}>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontWeight: qty > 0 ? 600 : 400,
+                                fontSize: { xs: '0.75rem', md: '0.875rem' }
+                              }}
+                            >
+                              {product.name}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{
+                                display: { xs: 'block', sm: 'none' },
+                                fontSize: '0.7rem'
+                              }}
+                            >
+                              ₹{product.price.toFixed(2)}
+                              {qty > 0 && ` • Total: ₹${itemTotal.toFixed(2)}`}
+                            </Typography>
+                          </TableCell>
+                          <TableCell
+                            align="right"
+                            sx={{
+                              display: { xs: 'none', sm: 'table-cell' },
+                              py: { xs: 1, md: 2 }
                             }}
-                            sx={{ width: 60 }}
-                          />
-                          <IconButton
-                            size="small"
-                            onClick={() => handleQuantityChange(product.id, 1)}
-                            sx={{ bgcolor: 'action.hover' }}
                           >
-                            <AddIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-                      </Card>
-                    </Grid>
-                  );
-                })}
-              </Grid>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontWeight: 600,
+                                fontSize: { xs: '0.75rem', md: '0.875rem' }
+                              }}
+                            >
+                              ₹{product.price.toFixed(2)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center" sx={{ py: { xs: 1, md: 2 } }}>
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: { xs: 0.5, md: 1 },
+                              }}
+                            >
+                              <IconButton
+                                size="small"
+                                onClick={() => handleQuantityChange(product.id, -1)}
+                                disabled={qty === 0}
+                                sx={{
+                                  bgcolor: 'action.hover',
+                                  width: { xs: 28, md: 32 },
+                                  height: { xs: 28, md: 32 }
+                                }}
+                              >
+                                <RemoveIcon sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }} />
+                              </IconButton>
+                              <TextField
+                                value={qty}
+                                onChange={(e) => handleQuantityInput(product.id, e.target.value)}
+                                type="number"
+                                slotProps={{
+                                  input: {
+                                    inputProps: {
+                                      min: 0,
+                                      style: {
+                                        textAlign: 'center',
+                                        padding: '6px',
+                                        fontSize: '0.875rem'
+                                      },
+                                    },
+                                  },
+                                }}
+                                sx={{ width: { xs: 50, md: 70 } }}
+                                size="small"
+                              />
+                              <IconButton
+                                size="small"
+                                onClick={() => handleQuantityChange(product.id, 1)}
+                                sx={{
+                                  bgcolor: 'action.hover',
+                                  width: { xs: 28, md: 32 },
+                                  height: { xs: 28, md: 32 }
+                                }}
+                              >
+                                <AddIcon sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }} />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                          <TableCell
+                            align="right"
+                            sx={{
+                              display: { xs: 'none', sm: 'table-cell' },
+                              py: { xs: 1, md: 2 }
+                            }}
+                          >
+                            {qty > 0 ? (
+                              <Typography
+                                variant="body2"
+                                color="primary"
+                                sx={{
+                                  fontWeight: 700,
+                                  fontSize: { xs: '0.75rem', md: '0.875rem' }
+                                }}
+                              >
+                                ₹{itemTotal.toFixed(2)}
+                              </Typography>
+                            ) : (
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}
+                              >
+                                -
+                              </Typography>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
             </Paper>
-          </Grid>
-
-          {/* Right Column - Order Summary */}
-          <Grid item xs={12} md={4}>
+          </div>
+          <div className="col-md-4 col-12 mt-md-0 mt-3">
+            {/* Right Column - Order Summary */}
             <Paper sx={{ p: 3, position: 'sticky', top: 80 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <CartIcon sx={{ mr: 1, color: 'primary.main' }} />
@@ -312,9 +380,9 @@ export default function EditOrder() {
               {orderItems.length > 0 ? (
                 <>
                   <Box sx={{ mb: 2 }}>
-                    {orderItems.map((item) => (
+                    {orderItems.map((item, index) => (
                       <Box
-                        key={item.productId}
+                        key={index}
                         sx={{
                           display: 'flex',
                           justifyContent: 'space-between',
@@ -351,11 +419,6 @@ export default function EditOrder() {
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                     <Typography variant="body1">Subtotal</Typography>
                     <Typography variant="body1">₹{subtotal.toFixed(2)}</Typography>
-                  </Box>
-
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body1">Tax (10%)</Typography>
-                    <Typography variant="body1">₹{tax.toFixed(2)}</Typography>
                   </Box>
 
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
@@ -403,10 +466,10 @@ export default function EditOrder() {
                 size="large"
                 fullWidth
                 onClick={handleUpdateOrder}
-                disabled={orderItems.length === 0}
+                disabled={loading || orderItems.length === 0}
                 startIcon={<SaveIcon />}
               >
-                Save Changes
+                {loading ? 'Saving...' : 'Save Changes'}
               </Button>
 
               {orderItems.length === 0 && (
@@ -419,8 +482,8 @@ export default function EditOrder() {
                 </Typography>
               )}
             </Paper>
-          </Grid>
-        </Grid>
+          </div>
+        </div>
       </Container>
     </Box>
   );

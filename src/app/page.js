@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Container, Typography, Box, Card, CardContent, Avatar } from '@mui/material';
+import { Container, Typography, Box, Card, CardContent, Avatar, Skeleton } from '@mui/material';
 import { useSelector } from 'react-redux';
 import {
   People as PeopleIcon,
@@ -9,13 +9,17 @@ import {
   Receipt as CreateOrderIcon,
   TrendingUp as TrendingIcon
 } from '@mui/icons-material';
-import { selectAllCustomers } from '../store/slices/customersSlice';
-import { selectAllOrders } from '../store/slices/ordersSlice';
+import { selectAllCustomers, selectCustomersSynced } from '../store/slices/customersSlice';
+import { selectAllOrders, selectOrdersSynced } from '../store/slices/ordersSlice';
 
 export default function Home() {
   const router = useRouter();
   const customers = useSelector(selectAllCustomers);
   const orders = useSelector(selectAllOrders);
+  const customersSynced = useSelector(selectCustomersSynced);
+  const ordersSynced = useSelector(selectOrdersSynced);
+
+  const isLoading = !customersSynced || !ordersSynced;
 
   // Calculate statistics
   const totalCustomers = customers.length;
@@ -45,9 +49,13 @@ export default function Home() {
                     <Typography variant="body2" color="text.secondary" gutterBottom>
                       Total Customers
                     </Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                      {totalCustomers}
-                    </Typography>
+                    {isLoading ? (
+                      <Skeleton variant="text" width={60} height={40} />
+                    ) : (
+                      <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                        {totalCustomers}
+                      </Typography>
+                    )}
                   </Box>
                   <Avatar sx={{ bgcolor: 'primary.main', width: 56, height: 56 }}>
                     <PeopleIcon />
@@ -64,9 +72,13 @@ export default function Home() {
                     <Typography variant="body2" color="text.secondary" gutterBottom>
                       Total Orders
                     </Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                      {totalOrders}
-                    </Typography>
+                    {isLoading ? (
+                      <Skeleton variant="text" width={60} height={40} />
+                    ) : (
+                      <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                        {totalOrders}
+                      </Typography>
+                    )}
                   </Box>
                   <Avatar sx={{ bgcolor: 'success.main', width: 56, height: 56 }}>
                     <OrdersIcon />
@@ -83,9 +95,13 @@ export default function Home() {
                     <Typography variant="body2" color="text.secondary" gutterBottom>
                       Today's Orders
                     </Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                      {todayOrders}
-                    </Typography>
+                    {isLoading ? (
+                      <Skeleton variant="text" width={60} height={40} />
+                    ) : (
+                      <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                        {todayOrders}
+                      </Typography>
+                    )}
                   </Box>
                   <Avatar sx={{ bgcolor: 'info.main', width: 56, height: 56 }}>
                     <CreateOrderIcon />
@@ -102,9 +118,13 @@ export default function Home() {
                     <Typography variant="body2" color="text.secondary" gutterBottom>
                       Total Revenue
                     </Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                      ₹{totalRevenue.toFixed(2)}
-                    </Typography>
+                    {isLoading ? (
+                      <Skeleton variant="text" width={100} height={40} />
+                    ) : (
+                      <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                        ₹{totalRevenue.toFixed(2)}
+                      </Typography>
+                    )}
                   </Box>
                   <Avatar sx={{ bgcolor: 'secondary.main', width: 56, height: 56 }}>
                     <TrendingIcon />

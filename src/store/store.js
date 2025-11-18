@@ -8,6 +8,7 @@ import cartReducer from './slices/cartSlice';
 import ordersReducer from './slices/ordersSlice';
 import customersReducer from './slices/customersSlice';
 import authReducer from './slices/authSlice';
+import paymentsReducer from './slices/paymentsSlice';
 
 // Combine all reducers
 const rootReducer = combineReducers({
@@ -17,13 +18,14 @@ const rootReducer = combineReducers({
   orders: ordersReducer,
   customers: customersReducer,
   auth: authReducer,
+  payments: paymentsReducer,
 });
 
 // Persist configuration
 const persistConfig = {
   key: 'root',
   storage,
-  whitelist: ['theme', 'orders', 'customers', 'auth'], // Only persist these reducers
+  whitelist: ['theme', 'orders', 'customers', 'auth', 'payments'], // Only persist these reducers
 };
 
 // Create persisted reducer

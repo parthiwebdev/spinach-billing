@@ -4,8 +4,9 @@ import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSelector } from 'react-redux';
 import { selectIsAuthenticated, selectUser } from '../store/slices/authSlice';
-import { isEmailAuthorized } from '../config/authorizedUsers';
-import { Box, CircularProgress } from '@mui/material';
+import { isEmailAuthorized, canAccessPage, isAdmin } from '../config/authorizedUsers';
+import { Box, CircularProgress, Container, Typography, Button, Paper } from '@mui/material';
+import { Lock as LockIcon } from '@mui/icons-material';
 
 // Public routes that don't require authentication
 const PUBLIC_ROUTES = ['/signin'];
@@ -35,9 +36,14 @@ export default function AuthGuard({ children }) {
       }
     }
 
-    // If authenticated and on signin page, redirect to home
+    // If authenticated and on signin page, redirect to appropriate page
     if (isAuthenticated && isPublicRoute) {
-      router.push('/');
+      // Redirect non-admins to create-order, admins to home
+      if (isAdmin(user?.email)) {
+        router.push('/');
+      } else {
+        router.push('/create-order');
+      }
     }
   }, [isAuthenticated, user, pathname, router]);
 
@@ -56,6 +62,41 @@ export default function AuthGuard({ children }) {
         <CircularProgress />
       </Box>
     );
+  }
+
+  // Check page-level access for authenticated users
+  if (isAuthenticated && user && !PUBLIC_ROUTES.includes(pathname)) {
+    if (!canAccessPage(user.email, pathname)) {
+      return (
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            minHeight: '100vh',
+            bgcolor: 'background.default',
+          }}
+        >
+          <Container maxWidth="sm">
+            <Paper sx={{ p: 4, textAlign: 'center' }}>
+              <LockIcon sx={{ fontSize: 60, color: 'error.main', mb: 2 }} />
+              <Typography variant="h5" gutterBottom sx={{ fontWeight: 600 }}>
+                Access Denied
+              </Typography>
+              <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                You don't have permission to access this page.
+              </Typography>
+              <Button
+                variant="contained"
+                onClick={() => router.push('/create-order')}
+              >
+                Go to Create Order
+              </Button>
+            </Paper>
+          </Container>
+        </Box>
+      );
+    }
   }
 
   return <>{children}</>;

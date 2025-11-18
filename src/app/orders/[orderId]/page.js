@@ -131,7 +131,7 @@ export default function OrderDetail() {
               </Typography>
               <Box sx={{ mt: 2 }}>
                 <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                  {order.customerInfo.name}
+                  {order?.customerInfo?.name}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   {order.customerInfo.email}
@@ -158,13 +158,9 @@ export default function OrderDetail() {
                   <Typography variant="body2">Subtotal</Typography>
                   <Typography variant="body2">₹{order.subtotal.toFixed(2)}</Typography>
                 </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body2">Tax</Typography>
-                  <Typography variant="body2">₹{order.tax.toFixed(2)}</Typography>
-                </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                   <Typography variant="body2">Shipping</Typography>
-                  <Typography variant="body2">₹{order.shipping.toFixed(2)}</Typography>
+                  <Typography variant="body2">₹{(order.shipping || 0).toFixed(2)}</Typography>
                 </Box>
                 <Divider />
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
@@ -188,9 +184,6 @@ export default function OrderDetail() {
           <List>
             {order.items.map((item) => (
               <ListItem key={item.productId} sx={{ px: 0 }}>
-                <ListItemAvatar>
-                  <Avatar src={item.image} alt={item.name} variant="rounded" sx={{ width: 60, height: 60 }} />
-                </ListItemAvatar>
                 <ListItemText
                   primary={
                     <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>

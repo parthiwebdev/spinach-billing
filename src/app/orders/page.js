@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useState, useMemo, useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
 import { useRouter } from 'next/navigation';
+import { selectAllCustomers } from '@/store/slices/customersSlice';
+import { markOrdersAsSeen, selectOrdersSynced } from '@/store/slices/ordersSlice';
 import {
   Container,
   Typography,
@@ -20,6 +22,7 @@ import {
   Grid,
   ToggleButtonGroup,
   ToggleButton,
+  Skeleton,
 } from '@mui/material';
 import {
   Visibility as ViewIcon,
@@ -29,10 +32,42 @@ import {
 
 export default function Orders() {
   const router = useRouter();
+  const dispatch = useDispatch();
   const orders = useSelector((state) => state.orders.orders);
+  const customers = useSelector(selectAllCustomers);
+  const ordersSynced = useSelector(selectOrdersSynced);
 
   const [selectedDate, setSelectedDate] = useState('');
   const [dateFilter, setDateFilter] = useState('all');
+
+  const isLoading = !ordersSynced;
+
+  // Mark orders as seen when admin visits this page
+  useEffect(() => {
+    dispatch(markOrdersAsSeen());
+  }, [dispatch, orders.length]);
+
+  // Create a map for quick customer lookup
+  const customerMap = useMemo(() => {
+    const map = {};
+    customers.forEach(customer => {
+      map[customer.id] = customer;
+    });
+    return map;
+  }, [customers]);
+
+  // Helper function to get customer name
+  const getCustomerName = (order) => {
+    // First try customerInfo (old format)
+    if (order.customerInfo?.name) {
+      return order.customerInfo.name;
+    }
+    // Then try customerId lookup (new Firebase format)
+    if (order.customerId && customerMap[order.customerId]) {
+      return customerMap[order.customerId].name;
+    }
+    return 'Unknown Customer';
+  };
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -64,6 +99,7 @@ export default function Orders() {
   const filteredOrders = orders.filter((order) => {
     const orderDate = new Date(order.date);
 
+
     if (dateFilter !== 'all' && dateFilter !== 'custom') {
       const range = getDateRange(dateFilter);
       if (range) {
@@ -80,6 +116,9 @@ export default function Orders() {
 
     return true;
   });
+
+  console.log(filteredOrders);
+
 
   const handleDateFilterChange = (event, newFilter) => {
     if (newFilter !== null) {
@@ -215,79 +254,98 @@ export default function Orders() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filteredOrders.map((order) => (
-                  <TableRow
-                    key={order.id}
-                    sx={{
-                      '&:hover': { bgcolor: 'action.hover' },
-                      cursor: 'pointer'
-                    }}
-                    onClick={() => router.push(`/orders/${order.id}`)}
-                  >
-                    <TableCell sx={{ py: { xs: 1.5, md: 2 } }}>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontWeight: 600,
-                          fontSize: { xs: '0.75rem', md: '0.875rem' }
-                        }}
-                      >
-                        {order.customerInfo.name}
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{
-                          display: 'block',
-                          fontSize: { xs: '0.7rem', md: '0.75rem' }
-                        }}
-                      >
-                        {formatDate(order.date)} • ₹{order.total.toFixed(2)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="center" sx={{ py: { xs: 1.5, md: 2 } }}>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontWeight: 600,
-                          fontSize: { xs: '0.875rem', md: '1rem' },
-                          color: 'primary.main'
-                        }}
-                      >
-                        {order.items.length}
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ fontSize: { xs: '0.65rem', md: '0.7rem' } }}
-                      >
-                        items
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="center" sx={{ py: { xs: 1.5, md: 2 } }}>
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          gap: { xs: 0.5, md: 1 },
-                          justifyContent: 'center'
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Button
-                          size="small"
-                          startIcon={<ViewIcon sx={{ fontSize: { xs: '0.875rem', md: '1rem' } }} />}
-                          onClick={() => router.push(`/orders/${order.id}`)}
+                {isLoading ? (
+                  // Skeleton loading rows
+                  [...Array(5)].map((_, index) => (
+                    <TableRow key={index}>
+                      <TableCell sx={{ py: { xs: 1.5, md: 2 } }}>
+                        <Skeleton variant="text" width="70%" />
+                        <Skeleton variant="text" width="50%" height={14} />
+                      </TableCell>
+                      <TableCell align="center" sx={{ py: { xs: 1.5, md: 2 } }}>
+                        <Skeleton variant="text" width={30} sx={{ mx: 'auto' }} />
+                        <Skeleton variant="text" width={40} height={12} sx={{ mx: 'auto' }} />
+                      </TableCell>
+                      <TableCell align="center" sx={{ py: { xs: 1.5, md: 2 } }}>
+                        <Skeleton variant="rounded" width={60} height={30} sx={{ mx: 'auto' }} />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  filteredOrders.map((order) => (
+                    <TableRow
+                      key={order.id}
+                      sx={{
+                        '&:hover': { bgcolor: 'action.hover' },
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => router.push(`/orders/${order.id}`)}
+                    >
+                      <TableCell sx={{ py: { xs: 1.5, md: 2 } }}>
+                        <Typography
+                          variant="body2"
                           sx={{
-                            fontSize: { xs: '0.7rem', md: '0.875rem' },
-                            px: { xs: 1, md: 2 }
+                            fontWeight: 600,
+                            fontSize: { xs: '0.75rem', md: '0.875rem' }
                           }}
                         >
-                          View
-                        </Button>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                          {getCustomerName(order)}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{
+                            display: 'block',
+                            fontSize: { xs: '0.7rem', md: '0.75rem' }
+                          }}
+                        >
+                          {formatDate(order.date)} • ₹{order.total.toFixed(2)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center" sx={{ py: { xs: 1.5, md: 2 } }}>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontWeight: 600,
+                            fontSize: { xs: '0.875rem', md: '1rem' },
+                            color: 'primary.main'
+                          }}
+                        >
+                          {order.items.length}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ fontSize: { xs: '0.65rem', md: '0.7rem' } }}
+                        >
+                          items
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center" sx={{ py: { xs: 1.5, md: 2 } }}>
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            gap: { xs: 0.5, md: 1 },
+                            justifyContent: 'center'
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Button
+                            size="small"
+                            startIcon={<ViewIcon sx={{ fontSize: { xs: '0.875rem', md: '1rem' } }} />}
+                            onClick={() => router.push(`/orders/${order.id}`)}
+                            sx={{
+                              fontSize: { xs: '0.7rem', md: '0.875rem' },
+                              px: { xs: 1, md: 2 }
+                            }}
+                          >
+                            View
+                          </Button>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </TableContainer>

@@ -1,7 +1,8 @@
 'use client';
 
 import { useRouter, useParams } from 'next/navigation';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import { useEffect } from 'react';
 import {
   Container,
   Typography,
@@ -18,23 +19,37 @@ import {
   IconButton,
   Divider,
   Alert,
+  Grid,
+  Card,
+  CardContent,
 } from '@mui/material';
 import {
   ArrowBack as BackIcon,
   Visibility as ViewIcon,
   Edit as EditIcon,
   Person as PersonIcon,
+  Payment as PaymentIcon,
+  ShoppingCart as OrderIcon,
 } from '@mui/icons-material';
 import { selectCustomerById } from '../../../../store/slices/customersSlice';
 import { selectAllOrders } from '../../../../store/slices/ordersSlice';
+import { selectCustomerPayments, initializeCustomerPaymentsListener } from '@/store/slices/paymentsSlice';
 
 export default function CustomerOrders() {
   const router = useRouter();
+  const dispatch = useDispatch();
   const params = useParams();
   const customerId = params.customerId;
 
-  const customer = useSelector(selectCustomerById(parseInt(customerId)));
+  const customer = useSelector(selectCustomerById(customerId));
   const allOrders = useSelector(selectAllOrders);
+  const customerPaymentHistory = useSelector(selectCustomerPayments(customerId));
+
+  useEffect(() => {
+    if (customerId) {
+      dispatch(initializeCustomerPaymentsListener(customerId));
+    }
+  }, [dispatch, customerId]);
 
   if (!customer) {
     return (
@@ -107,58 +122,121 @@ export default function CustomerOrders() {
           </Box>
         </Box>
 
-        {/* Customer Information */}
-        <Paper sx={{ p: 3, mb: 3 }}>
-          <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, mb: 2 }}>
-            Customer Information
-          </Typography>
-          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 3 }}>
-            <Box>
-              <Typography variant="body2" color="text.secondary">
-                Name
+        {/* Customer Information Cards */}
+        <Grid container spacing={3} sx={{ mb: 3 }}>
+          <Grid item xs={12} md={8}>
+            <Paper sx={{ p: 3 }}>
+              <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, mb: 2 }}>
+                Customer Information
               </Typography>
-              <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                {customer.name}
-              </Typography>
-            </Box>
-            <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' } }} />
-            <Box>
-              <Typography variant="body2" color="text.secondary">
-                Contact
-              </Typography>
-              <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                {customer.phone}
-              </Typography>
-            </Box>
-            <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' } }} />
-            <Box>
-              <Typography variant="body2" color="text.secondary">
-                City
-              </Typography>
-              <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                {customer.city}
-              </Typography>
-            </Box>
-            <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' } }} />
-            <Box>
-              <Typography variant="body2" color="text.secondary">
-                Total Orders
-              </Typography>
-              <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                {customer.orderHistory ? customer.orderHistory.length : 0}
-              </Typography>
-            </Box>
-            <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' } }} />
-            <Box>
-              <Typography variant="body2" color="text.secondary">
-                Total Spent
-              </Typography>
-              <Typography variant="body1" sx={{ fontWeight: 600, color: 'primary.main' }}>
-                ₹{(customer.totalSpent || 0).toFixed(2)}
-              </Typography>
-            </Box>
-          </Box>
-        </Paper>
+              <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 3 }}>
+                <Box>
+                  <Typography variant="body2" color="text.secondary">
+                    Name
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    {customer.name}
+                  </Typography>
+                </Box>
+                <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' } }} />
+                <Box>
+                  <Typography variant="body2" color="text.secondary">
+                    Contact
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    {customer.phone}
+                  </Typography>
+                </Box>
+                <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' } }} />
+                <Box>
+                  <Typography variant="body2" color="text.secondary">
+                    City
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    {customer.city}
+                  </Typography>
+                </Box>
+              </Box>
+            </Paper>
+          </Grid>
+
+          <Grid item xs={12} md={4}>
+            <Card sx={{ bgcolor: (customer.pendingBalance || 0) > 0 ? 'error.light' : 'success.light', color: 'white' }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                  <PaymentIcon sx={{ mr: 1 }} />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    Pending Balance
+                  </Typography>
+                </Box>
+                <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                  ₹{(customer.pendingBalance || 0).toFixed(2)}
+                </Typography>
+                <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
+                  Total Spent: ₹{(customer.totalSpent || 0).toFixed(2)}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+
+        {/* Payment History Section */}
+        {customerPaymentHistory && customerPaymentHistory.length > 0 && (
+          <Paper sx={{ p: 3, mb: 3 }}>
+            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, mb: 2 }}>
+              Payment History ({customerPaymentHistory.length} payments)
+            </Typography>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 600 }}>Amount Paid</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Method</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 600 }}>Previous Balance</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 600 }}>New Balance</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {customerPaymentHistory.slice(0, 5).map((payment) => (
+                    <TableRow key={payment.id}>
+                      <TableCell>
+                        {new Date(payment.paymentDate).toLocaleDateString('en-IN', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </TableCell>
+                      <TableCell align="right">
+                        <Typography variant="body2" color="success.main" sx={{ fontWeight: 600 }}>
+                          ₹{payment.amountPaid.toFixed(2)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip label={payment.paymentMethod} size="small" />
+                      </TableCell>
+                      <TableCell align="right">
+                        ₹{(payment.previousBalance || 0).toFixed(2)}
+                      </TableCell>
+                      <TableCell align="right">
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          ₹{(payment.newBalance || 0).toFixed(2)}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            {customerPaymentHistory.length > 5 && (
+              <Box sx={{ mt: 2, textAlign: 'center' }}>
+                <Typography variant="body2" color="text.secondary">
+                  Showing 5 most recent payments
+                </Typography>
+              </Box>
+            )}
+          </Paper>
+        )}
 
         {/* Orders Table */}
         <Paper sx={{ width: '100%', overflow: 'hidden' }}>

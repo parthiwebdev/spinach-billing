@@ -1,70 +1,130 @@
-# Getting Started with Create React App
+# Spinach Billing Application
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A modern, full-featured billing and customer management system built with Next.js, Firebase, and Redux Toolkit. Designed specifically for spinach product businesses with real-time inventory, order management, and payment tracking.
+
+## Features
+
+- **Customer Management**: Track customers with pending balance and payment history
+- **Order Management**: Create orders with automatic pending balance calculation
+- **Payment Processing**: Record payments and update balances automatically
+- **Product Catalog**: Manage spinach products (Fresh, Frozen, Organic)
+- **Real-time Sync**: Firebase real-time updates across all devices
+- **Bill Generation**: Clear bills showing current order + previous pending balance
+
+## Quick Start
+
+### 1. Install Dependencies
+```bash
+npm install
+```
+
+### 2. Set Up Firebase
+
+See [FIREBASE_SETUP.md](./FIREBASE_SETUP.md) for detailed Firebase configuration.
+
+Quick steps:
+1. Create Firebase project at [Firebase Console](https://console.firebase.google.com/)
+2. Enable Firestore Database
+3. Copy `.env.local.example` to `.env.local`
+4. Add your Firebase credentials to `.env.local`
+
+### 3. Run Development Server
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000)
+
+### 4. Migrate Initial Data
+
+Navigate to [http://localhost:3000/migrate](http://localhost:3000/migrate) and click "Migrate All"
 
 ## Available Scripts
 
-In the project directory, you can run:
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm start` - Start production server
+- `npm run lint` - Run ESLint
 
-### `npm start`
+## Technology Stack
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- **Frontend**: Next.js 15.1.0, React 19.2.0
+- **Database**: Firebase Firestore
+- **State**: Redux Toolkit + Redux Persist
+- **UI**: Material-UI 7.3.5
+- **Forms**: Formik + Yup
+- **Auth**: Google OAuth
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Key Features
 
-### `npm test`
+### Pending Balance System
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+When creating an order:
+1. Enter customer phone number
+2. System checks for existing customer
+3. If found, displays previous pending balance
+4. Bill shows: **Order Total + Previous Pending = Total Due**
+5. Customer's balance updates automatically
 
-### `npm run build`
+### Payment Recording
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+Record payments at [/payments](http://localhost:3000/payments):
+1. Select customer (shows current pending balance)
+2. Enter payment amount
+3. System automatically:
+   - Creates payment record
+   - Reduces customer's pending balance
+   - Updates order status if applicable
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## Project Structure
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+```
+src/
+├── app/               # Next.js pages
+├── components/        # React components
+├── store/slices/      # Redux slices with Firebase
+├── services/          # Firebase CRUD operations
+├── config/            # Firebase configuration
+├── data/              # Mock data for migration
+└── scripts/           # Migration scripts
+```
 
-### `npm run eject`
+## Documentation
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+- [FIREBASE_SETUP.md](./FIREBASE_SETUP.md) - Complete Firebase setup guide with security rules
+- [src/services/firebaseService.js](src/services/firebaseService.js) - Firebase API documentation
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## Firestore Collections
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+- **customers**: Customer data with `pendingBalance`
+- **products**: Product catalog
+- **orders**: Orders with `totalWithPending`
+- **payments**: Payment transactions with balance history
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## Security
 
-## Learn More
+- Google OAuth authentication
+- Email whitelist authorization
+- Firebase security rules
+- No deletions allowed (audit trail)
+- Payment immutability
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## Deployment
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+Deploy to Vercel:
+```bash
+npm run build
+```
 
-### Code Splitting
+Add environment variables in Vercel dashboard.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## Support
 
-### Analyzing the Bundle Size
+For issues:
+1. Check [FIREBASE_SETUP.md](./FIREBASE_SETUP.md)
+2. Review browser console for errors
+3. Check Firebase Console for database errors
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+---
 
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+**Built with Next.js and Firebase** | Version 1.0.0

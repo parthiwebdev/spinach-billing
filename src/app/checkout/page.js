@@ -2,6 +2,7 @@
 
 import { useSelector, useDispatch } from 'react-redux';
 import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { Formik, Form, Field } from 'formik';
 import * as Yup from 'yup';
 import {
@@ -19,10 +20,12 @@ import {
   ListItemText,
   Avatar,
   Alert,
+  Chip,
 } from '@mui/material';
 import { selectCartTotal, clearCart } from '../../store/slices/cartSlice';
-import { createOrder } from '../../store/slices/ordersSlice';
-import { addOrUpdateCustomer } from '../../store/slices/customersSlice';
+import { createOrderWithBalance } from '../../store/slices/ordersSlice';
+import { saveCustomer, selectCustomerByPhone } from '../../store/slices/customersSlice';
+import { findCustomerByContact } from '@/services/firebaseService';
 
 // Validation schema
 const validationSchema = Yup.object({
@@ -61,58 +64,104 @@ export default function Checkout() {
   const router = useRouter();
   const cartItems = useSelector((state) => state.cart.items);
   const subtotal = useSelector(selectCartTotal);
-  const isAuthenticated = useSelector((state) => state.example.isAuthenticated);
+  const isAuthenticated = useSelector((state) => state.auth?.user);
 
-  const TAX_RATE = 0.1; // 10% tax
-  const SHIPPING_FEE = 5.99;
+  const [customerPendingBalance, setCustomerPendingBalance] = useState(0);
+  const [customerId, setCustomerId] = useState(null);
+  const [phoneNumber, setPhoneNumber] = useState('');
 
-  const tax = subtotal * TAX_RATE;
-  const total = subtotal + tax + SHIPPING_FEE;
+  const SHIPPING_FEE = 0; // No shipping fee
 
-  const handleSubmit = (values, { setSubmitting }) => {
-    const orderDate = new Date().toISOString();
+  const orderSubtotal = subtotal + SHIPPING_FEE;
+  const totalWithPending = orderSubtotal + customerPendingBalance;
 
-    // Format phone number to match customer data format (555) 123-4567
-    const formattedPhone = `(${values.phone.substring(0, 3)}) ${values.phone.substring(3, 6)}-${values.phone.substring(6)}`;
+  // Check for existing customer when phone number changes
+  const handlePhoneChange = async (phone, setFieldValue) => {
+    setPhoneNumber(phone);
+    if (phone.length === 10) {
+      try {
+        const formattedPhone = `(${phone.substring(0, 3)}) ${phone.substring(3, 6)}-${phone.substring(6)}`;
+        const existingCustomer = await findCustomerByContact(formattedPhone, '');
 
-    const customerInfo = {
-      ...values,
-      phone: formattedPhone,
-    };
+        if (existingCustomer) {
+          setCustomerPendingBalance(existingCustomer.pendingBalance || 0);
+          setCustomerId(existingCustomer.id);
 
-    // Create order
-    dispatch(
-      createOrder({
-        customerInfo,
+          // Auto-fill form if customer exists
+          setFieldValue('name', existingCustomer.name);
+          setFieldValue('email', existingCustomer.email);
+          setFieldValue('address', existingCustomer.address);
+          setFieldValue('city', existingCustomer.city);
+          setFieldValue('zipCode', existingCustomer.zipCode);
+        } else {
+          setCustomerPendingBalance(0);
+          setCustomerId(null);
+        }
+      } catch (error) {
+        console.error('Error checking customer:', error);
+      }
+    } else {
+      setCustomerPendingBalance(0);
+      setCustomerId(null);
+    }
+  };
+
+  const handleSubmit = async (values, { setSubmitting }) => {
+    try {
+      const orderDate = new Date().toISOString();
+
+      // Format phone number to match customer data format (555) 123-4567
+      const formattedPhone = `(${values.phone.substring(0, 3)}) ${values.phone.substring(3, 6)}-${values.phone.substring(6)}`;
+
+      const customerData = {
+        name: values.name,
+        email: values.email,
+        phone: formattedPhone,
+        address: values.address,
+        city: values.city,
+        zipCode: values.zipCode,
+      };
+
+      // Always save/update customer to get Firebase ID
+      console.log('Saving customer...', customerData);
+      const savedCustomer = await dispatch(saveCustomer(customerData));
+      const finalCustomerId = savedCustomer.id;
+      console.log('Customer saved with ID:', finalCustomerId);
+
+      if (!finalCustomerId) {
+        throw new Error('Failed to get customer ID');
+      }
+
+      // Create order with pending balance
+      const orderData = {
+        orderNumber: `ORD-${Date.now()}`,
+        date: orderDate,
+        customerInfo: customerData,
         items: cartItems,
-        subtotal,
-        tax,
+        subtotal: orderSubtotal,
         shipping: SHIPPING_FEE,
-        total,
-      })
-    );
+        total: orderSubtotal,
+      };
 
-    // Get the order ID (it will be the latest order)
-    const orderId = Date.now().toString();
+      console.log('Creating order...', orderData);
+      const order = await dispatch(
+        createOrderWithBalance(orderData, finalCustomerId, customerPendingBalance)
+      );
+      console.log('Order created:', order);
 
-    // Add or update customer with order information
-    dispatch(
-      addOrUpdateCustomer({
-        customerInfo,
-        orderId,
-        orderTotal: total,
-        orderDate,
-      })
-    );
+      // Clear cart
+      dispatch(clearCart());
 
-    // Clear cart
-    dispatch(clearCart());
-
-    // Redirect to order confirmation
-    setTimeout(() => {
+      // Redirect to orders page
+      setTimeout(() => {
+        setSubmitting(false);
+        router.push('/orders');
+      }, 1000);
+    } catch (error) {
+      console.error('Error creating order:', error);
+      alert(`Failed to create order: ${error.message}`);
       setSubmitting(false);
-      router.push('/orders/latest');
-    }, 1000);
+    }
   };
 
   if (cartItems.length === 0) {
@@ -166,11 +215,29 @@ export default function Checkout() {
                 validationSchema={validationSchema}
                 onSubmit={handleSubmit}
               >
-                {({ isSubmitting }) => (
+                {({ isSubmitting, setFieldValue, values }) => (
                   <Form>
                     <Field name="name" component={FormikTextField} label="Full Name" />
                     <Field name="email" component={FormikTextField} label="Email" type="email" />
-                    <Field name="phone" component={FormikTextField} label="Phone Number" />
+                    <Field
+                      name="phone"
+                      component={FormikTextField}
+                      label="Phone Number"
+                      onChange={(e) => {
+                        setFieldValue('phone', e.target.value);
+                        handlePhoneChange(e.target.value, setFieldValue);
+                      }}
+                    />
+                    {customerId && (
+                      <Alert severity="info" sx={{ mt: 2 }}>
+                        Existing customer found! Form auto-filled with saved information.
+                        {customerPendingBalance > 0 && (
+                          <Typography variant="body2" sx={{ mt: 1 }}>
+                            <strong>Previous Pending Balance: ₹{customerPendingBalance.toFixed(2)}</strong>
+                          </Typography>
+                        )}
+                      </Alert>
+                    )}
                     <Field
                       name="address"
                       component={FormikTextField}
@@ -235,26 +302,53 @@ export default function Checkout() {
                 <Typography variant="body1">₹{subtotal.toFixed(2)}</Typography>
               </Box>
 
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                <Typography variant="body1">Tax (10%)</Typography>
-                <Typography variant="body1">₹{tax.toFixed(2)}</Typography>
-              </Box>
-
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                <Typography variant="body1">Shipping</Typography>
-                <Typography variant="body1">₹{SHIPPING_FEE.toFixed(2)}</Typography>
-              </Box>
+              {SHIPPING_FEE > 0 && (
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                  <Typography variant="body1">Shipping</Typography>
+                  <Typography variant="body1">₹{SHIPPING_FEE.toFixed(2)}</Typography>
+                </Box>
+              )}
 
               <Divider sx={{ my: 2 }} />
 
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  Total
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                  Order Total
                 </Typography>
-                <Typography variant="h6" color="primary" sx={{ fontWeight: 700 }}>
-                  ₹{total.toFixed(2)}
+                <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                  ₹{orderSubtotal.toFixed(2)}
                 </Typography>
               </Box>
+
+              {customerPendingBalance > 0 && (
+                <>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                    <Typography variant="body1" color="error">
+                      Previous Pending Balance
+                    </Typography>
+                    <Typography variant="body1" color="error">
+                      ₹{customerPendingBalance.toFixed(2)}
+                    </Typography>
+                  </Box>
+
+                  <Divider sx={{ my: 2 }} />
+                </>
+              )}
+
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  Total Amount Due
+                </Typography>
+                <Typography variant="h6" color="primary" sx={{ fontWeight: 700 }}>
+                  ₹{totalWithPending.toFixed(2)}
+                </Typography>
+              </Box>
+
+              {customerPendingBalance > 0 && (
+                <Alert severity="warning" sx={{ mt: 2 }}>
+                  This includes previous pending balance of ₹{customerPendingBalance.toFixed(2)}
+                </Alert>
+              )}
             </Paper>
           </Grid>
         </Grid>

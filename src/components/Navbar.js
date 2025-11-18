@@ -15,6 +15,7 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
+  Badge,
 } from '@mui/material';
 import {
   Home as HomeIcon,
@@ -27,6 +28,8 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useRouter } from 'next/navigation';
 import { toggleTheme } from '../store/slices/themeSlice';
 import { selectUser, selectIsAuthenticated, logout } from '../store/slices/authSlice';
+import { selectUnseenOrderCount } from '../store/slices/ordersSlice';
+import { isAdmin } from '../config/authorizedUsers';
 
 const Navbar = () => {
   const dispatch = useDispatch();
@@ -34,7 +37,9 @@ const Navbar = () => {
   const user = useSelector(selectUser);
   const isAuthenticated = useSelector(selectIsAuthenticated);
   const mode = useSelector((state) => state.theme.mode);
+  const unseenOrderCount = useSelector(selectUnseenOrderCount);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
+  const userIsAdmin = isAdmin(user?.email);
 
   const handleThemeToggle = () => {
     dispatch(toggleTheme());
@@ -59,7 +64,7 @@ const Navbar = () => {
       <Toolbar>
         <IconButton
           component={Link}
-          href="/"
+          href={userIsAdmin ? "/" : "/create-order"}
           edge="start"
           color="inherit"
           aria-label="home"
@@ -79,15 +84,21 @@ const Navbar = () => {
         )}
 
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-          <Button color="inherit" component={Link} href="/">
-            Home
-          </Button>
-          <Button color="inherit" component={Link} href="/products">
-            Products
-          </Button>
-          <Button color="inherit" component={Link} href="/customers">
-            Customers
-          </Button>
+          {userIsAdmin && (
+            <Button color="inherit" component={Link} href="/">
+              Home
+            </Button>
+          )}
+          {userIsAdmin && (
+            <Button color="inherit" component={Link} href="/products">
+              Products
+            </Button>
+          )}
+          {userIsAdmin && (
+            <Button color="inherit" component={Link} href="/customers">
+              Customers
+            </Button>
+          )}
           <Button
             color="inherit"
             component={Link}
@@ -96,9 +107,13 @@ const Navbar = () => {
           >
             Create Order
           </Button>
-          <Button color="inherit" component={Link} href="/orders">
-            Orders
-          </Button>
+          {userIsAdmin && (
+            <Button color="inherit" component={Link} href="/orders">
+              <Badge badgeContent={unseenOrderCount} color="error" max={99}>
+                Orders
+              </Badge>
+            </Button>
+          )}
           <Button color="inherit" component={Link} href="/settings">
             Settings
           </Button>

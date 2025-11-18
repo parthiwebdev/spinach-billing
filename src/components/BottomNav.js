@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import Link from 'next/link';
+import { useSelector } from 'react-redux';
 import {
   BottomNavigation,
   BottomNavigationAction,
   Paper,
   Box,
+  Badge,
 } from '@mui/material';
 import {
   Home as HomeIcon,
@@ -15,15 +16,22 @@ import {
   People as CustomersIcon,
   Receipt as OrdersIcon,
   Settings as SettingsIcon,
+  AddCircle as CreateOrderIcon,
 } from '@mui/icons-material';
+import { selectUser } from '../store/slices/authSlice';
+import { selectUnseenOrderCount } from '../store/slices/ordersSlice';
+import { isAdmin } from '../config/authorizedUsers';
 
 const BottomNav = () => {
   const router = useRouter();
   const pathname = usePathname();
+  const user = useSelector(selectUser);
+  const unseenOrderCount = useSelector(selectUnseenOrderCount);
+  const userIsAdmin = isAdmin(user?.email);
   const [value, setValue] = useState(0);
 
-  // Map routes to navigation values
-  const routeToValue = {
+  // Map routes to navigation values based on user role
+  const adminRouteToValue = {
     '/': 0,
     '/products': 1,
     '/customers': 2,
@@ -32,11 +40,18 @@ const BottomNav = () => {
     '/settings': 4,
   };
 
+  const userRouteToValue = {
+    '/create-order': 0,
+    '/settings': 1,
+  };
+
+  const routeToValue = userIsAdmin ? adminRouteToValue : userRouteToValue;
+
   // Update value based on current route
   useEffect(() => {
     const navValue = routeToValue[pathname] ?? 0;
     setValue(navValue);
-  }, [pathname]);
+  }, [pathname, userIsAdmin]);
 
   const handleNavigation = (path) => {
     router.push(path);
@@ -69,31 +84,57 @@ const BottomNav = () => {
             },
           }}
         >
-          <BottomNavigationAction
-            label="Home"
-            icon={<HomeIcon />}
-            onClick={() => handleNavigation('/')}
-          />
-          <BottomNavigationAction
-            label="Products"
-            icon={<ProductsIcon />}
-            onClick={() => handleNavigation('/products')}
-          />
-          <BottomNavigationAction
-            label="Customers"
-            icon={<CustomersIcon />}
-            onClick={() => handleNavigation('/customers')}
-          />
-          <BottomNavigationAction
-            label="Orders"
-            icon={<OrdersIcon />}
-            onClick={() => handleNavigation('/orders')}
-          />
-          <BottomNavigationAction
-            label="Settings"
-            icon={<SettingsIcon />}
-            onClick={() => handleNavigation('/settings')}
-          />
+          {userIsAdmin ? [
+            // Admin navigation
+            <BottomNavigationAction
+              key="home"
+              label="Home"
+              icon={<HomeIcon />}
+              onClick={() => handleNavigation('/')}
+            />,
+            <BottomNavigationAction
+              key="products"
+              label="Products"
+              icon={<ProductsIcon />}
+              onClick={() => handleNavigation('/products')}
+            />,
+            <BottomNavigationAction
+              key="customers"
+              label="Customers"
+              icon={<CustomersIcon />}
+              onClick={() => handleNavigation('/customers')}
+            />,
+            <BottomNavigationAction
+              key="orders"
+              label="Orders"
+              icon={
+                <Badge badgeContent={unseenOrderCount} color="error" max={99}>
+                  <OrdersIcon />
+                </Badge>
+              }
+              onClick={() => handleNavigation('/orders')}
+            />,
+            <BottomNavigationAction
+              key="settings"
+              label="Settings"
+              icon={<SettingsIcon />}
+              onClick={() => handleNavigation('/settings')}
+            />
+          ] : [
+            // Regular user navigation - limited pages only
+            <BottomNavigationAction
+              key="create-order"
+              label="Create Order"
+              icon={<CreateOrderIcon />}
+              onClick={() => handleNavigation('/create-order')}
+            />,
+            <BottomNavigationAction
+              key="settings"
+              label="Settings"
+              icon={<SettingsIcon />}
+              onClick={() => handleNavigation('/settings')}
+            />
+          ]}
         </BottomNavigation>
       </Paper>
     </Box>
