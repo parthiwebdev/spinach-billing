@@ -1,5 +1,4 @@
 import { createSlice } from '@reduxjs/toolkit';
-import { customersData } from '../../data/customersData';
 import {
   createCustomer,
   updateCustomer,
@@ -12,7 +11,7 @@ import {
 let customersListener = null;
 
 const initialState = {
-  customers: customersData,
+  customers: [], // Start with empty array - only show Firebase data
   loading: false,
   error: null,
   synced: false // Track if data is synced with Firebase

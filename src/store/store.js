@@ -21,11 +21,11 @@ const rootReducer = combineReducers({
   payments: paymentsReducer,
 });
 
-// Persist configuration
+// Persist configuration - Only persist theme and auth, NOT data from Firebase
 const persistConfig = {
   key: 'root',
   storage,
-  whitelist: ['theme', 'orders', 'customers', 'auth', 'payments'], // Only persist these reducers
+  whitelist: ['theme', 'auth'], // Only persist theme and auth - all other data comes from Firebase real-time
 };
 
 // Create persisted reducer

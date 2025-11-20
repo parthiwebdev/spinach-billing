@@ -201,19 +201,33 @@ export const updateProduct = async (productId, updates) => {
  */
 export const bulkUpdateProductPrices = async (productUpdates) => {
   try {
+    // Validate all prices before starting batch
+    const validUpdates = productUpdates.filter(({ id, price }) => {
+      const numPrice = Number(price);
+      if (!id || isNaN(numPrice) || numPrice <= 0) {
+        console.warn(`Skipping invalid price update: id=${id}, price=${price}`);
+        return false;
+      }
+      return true;
+    });
+
+    if (validUpdates.length === 0) {
+      throw new Error('No valid price updates to save');
+    }
+
     const batch = writeBatch(db);
 
-    productUpdates.forEach(({ id, price }) => {
+    validUpdates.forEach(({ id, price }) => {
       const productRef = doc(db, COLLECTIONS.PRODUCTS, id);
       batch.update(productRef, {
-        price,
+        price: Number(price), // Ensure price is always a number
         updatedAt: serverTimestamp()
       });
     });
 
     await batch.commit();
-    console.log(`Bulk updated ${productUpdates.length} product prices`);
-    return { count: productUpdates.length };
+    console.log(`Bulk updated ${validUpdates.length} product prices`);
+    return { count: validUpdates.length };
   } catch (error) {
     console.error('Error bulk updating product prices:', error);
     throw error;

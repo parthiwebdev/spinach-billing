@@ -1,5 +1,4 @@
 import { createSlice } from '@reduxjs/toolkit';
-import { vegetableProducts } from '../../data/vegetableProducts';
 import {
   createProduct,
   updateProduct,
@@ -10,7 +9,7 @@ import {
 let productsListener = null;
 
 const initialState = {
-  items: vegetableProducts,
+  items: [], // Start with empty array - only show Firebase data
   selectedCategory: 'All',
   searchQuery: '',
   loading: false,

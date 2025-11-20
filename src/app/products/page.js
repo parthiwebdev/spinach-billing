@@ -89,10 +89,18 @@ export default function Products() {
 
   const handleSave = async () => {
     const updates = products
-      .filter(product => editedPrices[product.id] !== product.price)
+      .filter(product => {
+        const editedPrice = editedPrices[product.id];
+        // Only include products with valid numeric prices that differ from original
+        return editedPrice !== undefined &&
+               editedPrice !== '' &&
+               editedPrice !== null &&
+               typeof editedPrice === 'number' &&
+               editedPrice !== product.price;
+      })
       .map(product => ({
         id: product.id,
-        price: editedPrices[product.id]
+        price: parseFloat(editedPrices[product.id])
       }));
 
     if (updates.length === 0) {
