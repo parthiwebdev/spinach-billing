@@ -99,7 +99,7 @@ export default function SignIn() {
                   color: 'primary.main',
                 }}
               >
-                Spinach Billing
+                Vegetables Billing
               </Typography>
               <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
                 Sign in to your account

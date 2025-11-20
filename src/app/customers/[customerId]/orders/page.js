@@ -2,7 +2,7 @@
 
 import { useRouter, useParams } from 'next/navigation';
 import { useSelector, useDispatch } from 'react-redux';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Container,
   Typography,
@@ -16,40 +16,111 @@ import {
   TableHead,
   TableRow,
   Chip,
-  IconButton,
   Divider,
-  Alert,
   Grid,
   Card,
   CardContent,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  MenuItem,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import {
   ArrowBack as BackIcon,
-  Visibility as ViewIcon,
-  Edit as EditIcon,
   Person as PersonIcon,
   Payment as PaymentIcon,
-  ShoppingCart as OrderIcon,
+  Add as AddIcon,
 } from '@mui/icons-material';
 import { selectCustomerById } from '../../../../store/slices/customersSlice';
-import { selectAllOrders } from '../../../../store/slices/ordersSlice';
-import { selectCustomerPayments, initializeCustomerPaymentsListener } from '@/store/slices/paymentsSlice';
+import { selectCustomerPayments, initializeCustomerPaymentsListener, createPayment } from '@/store/slices/paymentsSlice';
 
-export default function CustomerOrders() {
+export default function CustomerDetails() {
   const router = useRouter();
   const dispatch = useDispatch();
   const params = useParams();
   const customerId = params.customerId;
 
   const customer = useSelector(selectCustomerById(customerId));
-  const allOrders = useSelector(selectAllOrders);
   const customerPaymentHistory = useSelector(selectCustomerPayments(customerId));
+
+  // Payment dialog state
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('Cash');
+  const [paymentNotes, setPaymentNotes] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
 
   useEffect(() => {
     if (customerId) {
       dispatch(initializeCustomerPaymentsListener(customerId));
     }
   }, [dispatch, customerId]);
+
+  // Payment handlers
+  const handleOpenPaymentDialog = () => {
+    setPaymentDialogOpen(true);
+    setPaymentAmount('');
+    setPaymentMethod('Cash');
+    setPaymentNotes('');
+  };
+
+  const handleClosePaymentDialog = () => {
+    setPaymentDialogOpen(false);
+    setPaymentAmount('');
+    setPaymentMethod('Cash');
+    setPaymentNotes('');
+  };
+
+  const handlePaymentSubmit = async () => {
+    const amount = parseFloat(paymentAmount);
+
+    if (!amount || amount <= 0) {
+      setSnackbar({
+        open: true,
+        message: 'Please enter a valid payment amount',
+        severity: 'error'
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      await dispatch(createPayment({
+        customerId,
+        amountPaid: amount,
+        paymentMethod,
+        notes: paymentNotes || `Payment received via ${paymentMethod}`
+      }));
+
+      setSnackbar({
+        open: true,
+        message: `Payment of ₹${amount.toFixed(2)} recorded successfully`,
+        severity: 'success'
+      });
+      handleClosePaymentDialog();
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: `Error recording payment: ${error.message}`,
+        severity: 'error'
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleSnackbarClose = () => {
+    setSnackbar(prev => ({ ...prev, open: false }));
+  };
 
   if (!customer) {
     return (
@@ -66,39 +137,8 @@ export default function CustomerOrders() {
     );
   }
 
-  // Get orders for this customer
-  const customerOrders = customer.orderHistory
-    ? allOrders.filter((order) =>
-        customer.orderHistory.some((oh) => oh.orderId === order.id)
-      )
-    : [];
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'Completed':
-        return 'success';
-      case 'Processing':
-        return 'info';
-      case 'Pending':
-        return 'warning';
-      case 'Cancelled':
-        return 'error';
-      default:
-        return 'default';
-    }
-  };
-
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
   return (
-    <Box sx={{ bgcolor: 'background.default', minHeight: 'calc(100vh - 64px)', py: { xs: 2, md: 4 }, pb: { xs: 10, md: 4 } }}>
+    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: { xs: 2, md: 4 }, pb: { xs: 10, md: 4 } }}>
       <Container maxWidth="xl">
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, px: { xs: 1, md: 0 } }}>
           <Button
@@ -114,17 +154,17 @@ export default function CustomerOrders() {
           <PersonIcon sx={{ fontSize: 40, mr: 2, color: 'primary.main' }} />
           <Box>
             <Typography variant="h3" component="h1" sx={{ fontWeight: 700, fontSize: { xs: '1.75rem', md: '3rem' } }}>
-              Customer Orders
+              Customer Details
             </Typography>
             <Typography variant="body1" color="text.secondary">
-              Order history for {customer.name}
+              {customer.name}
             </Typography>
           </Box>
         </Box>
 
         {/* Customer Information Cards */}
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid item xs={12} md={8}>
+        <div className="row mb-sm-4 mb-3">
+          <div className="col-md-9 col-sm-8 col-12">
             <Paper sx={{ p: 3 }}>
               <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, mb: 2 }}>
                 Customer Information
@@ -147,20 +187,23 @@ export default function CustomerOrders() {
                     {customer.phone}
                   </Typography>
                 </Box>
-                <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' } }} />
-                <Box>
-                  <Typography variant="body2" color="text.secondary">
-                    City
-                  </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                    {customer.city}
-                  </Typography>
-                </Box>
+                {customer.address && (
+                  <>
+                    <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' } }} />
+                    <Box>
+                      <Typography variant="body2" color="text.secondary">
+                        Address
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                        {customer.address}
+                      </Typography>
+                    </Box>
+                  </>
+                )}
               </Box>
             </Paper>
-          </Grid>
-
-          <Grid item xs={12} md={4}>
+          </div>
+          <div className="col-md-3 col-sm-4 col-12 mt-sm-0 mt-3">
             <Card sx={{ bgcolor: (customer.pendingBalance || 0) > 0 ? 'error.light' : 'success.light', color: 'white' }}>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
@@ -175,159 +218,184 @@ export default function CustomerOrders() {
                 <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
                   Total Spent: ₹{(customer.totalSpent || 0).toFixed(2)}
                 </Typography>
+                {(customer.pendingBalance || 0) > 0 && (
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={handleOpenPaymentDialog}
+                    sx={{
+                      mt: 2,
+                      bgcolor: 'white',
+                      color: 'error.main',
+                      '&:hover': {
+                        bgcolor: 'rgba(255, 255, 255, 0.9)',
+                      }
+                    }}
+                    fullWidth
+                  >
+                    Record Payment
+                  </Button>
+                )}
               </CardContent>
             </Card>
-          </Grid>
-        </Grid>
-
+          </div>
+        </div>
         {/* Payment History Section */}
         {customerPaymentHistory && customerPaymentHistory.length > 0 && (
           <Paper sx={{ p: 3, mb: 3 }}>
             <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, mb: 2 }}>
-              Payment History ({customerPaymentHistory.length} payments)
+              Transaction History ({customerPaymentHistory.length} entries)
             </Typography>
             <TableContainer>
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 600 }}>Amount Paid</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Method</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 600 }}>Previous Balance</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Date / Type</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 600 }}>Amount</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 600, display: { xs: 'none', sm: 'table-cell' } }}>Previous Balance</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 600 }}>New Balance</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {customerPaymentHistory.slice(0, 5).map((payment) => (
-                    <TableRow key={payment.id}>
-                      <TableCell>
-                        {new Date(payment.paymentDate).toLocaleDateString('en-IN', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                      </TableCell>
-                      <TableCell align="right">
-                        <Typography variant="body2" color="success.main" sx={{ fontWeight: 600 }}>
-                          ₹{payment.amountPaid.toFixed(2)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Chip label={payment.paymentMethod} size="small" />
-                      </TableCell>
-                      <TableCell align="right">
-                        ₹{(payment.previousBalance || 0).toFixed(2)}
-                      </TableCell>
-                      <TableCell align="right">
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          ₹{(payment.newBalance || 0).toFixed(2)}
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {customerPaymentHistory.slice(0, 10).map((payment) => {
+                    const isOrder = payment.type === 'order' || payment.amountPaid < 0;
+                    const amount = Math.abs(payment.amountPaid);
+                    return (
+                      <TableRow key={payment.id}>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                            {new Date(payment.paymentDate).toLocaleDateString('en-IN', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                            })}
+                          </Typography>
+                          <Chip
+                            label={isOrder ? 'Order' : payment.paymentMethod}
+                            size="small"
+                            color={isOrder ? 'warning' : 'success'}
+                            variant={isOrder ? 'outlined' : 'filled'}
+                          />
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography
+                            variant="body2"
+                            color={isOrder ? 'error.main' : 'success.main'}
+                            sx={{ fontWeight: 600 }}
+                          >
+                            {isOrder ? '+' : '-'}₹{amount.toFixed(2)}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right" sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
+                          ₹{(payment.previousBalance || 0).toFixed(2)}
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            ₹{(payment.newBalance || 0).toFixed(2)}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </TableContainer>
-            {customerPaymentHistory.length > 5 && (
+            {customerPaymentHistory.length > 10 && (
               <Box sx={{ mt: 2, textAlign: 'center' }}>
                 <Typography variant="body2" color="text.secondary">
-                  Showing 5 most recent payments
+                  Showing 10 most recent transactions
                 </Typography>
               </Box>
             )}
           </Paper>
         )}
 
-        {/* Orders Table */}
-        <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-          <Box sx={{ p: 3, pb: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>
-              Order History ({customerOrders.length} orders)
-            </Typography>
-          </Box>
+        {/* Payment Dialog */}
+        <Dialog open={paymentDialogOpen} onClose={handleClosePaymentDialog} maxWidth="sm" fullWidth>
+          <DialogTitle>Record Payment</DialogTitle>
+          <DialogContent>
+            <Box sx={{ pt: 2 }}>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Customer: <strong>{customer.name}</strong>
+              </Typography>
+              <Typography variant="body2" color="text.secondary" gutterBottom sx={{ mb: 3 }}>
+                Pending Balance: <strong>₹{(customer.pendingBalance || 0).toFixed(2)}</strong>
+              </Typography>
 
-          {customerOrders.length === 0 ? (
-            <Box sx={{ p: 4, textAlign: 'center' }}>
-              <Alert severity="info">
-                No orders found for this customer.
-              </Alert>
+              <TextField
+                autoFocus
+                margin="dense"
+                label="Payment Amount"
+                type="number"
+                fullWidth
+                variant="outlined"
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(e.target.value)}
+                inputProps={{ min: 0, step: 0.01 }}
+                sx={{ mb: 2 }}
+              />
+
+              <TextField
+                select
+                margin="dense"
+                label="Payment Method"
+                fullWidth
+                variant="outlined"
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+                sx={{ mb: 2 }}
+              >
+                <MenuItem value="Cash">Cash</MenuItem>
+                <MenuItem value="UPI">UPI</MenuItem>
+                <MenuItem value="Card">Card</MenuItem>
+                <MenuItem value="Bank Transfer">Bank Transfer</MenuItem>
+                <MenuItem value="Cheque">Cheque</MenuItem>
+                <MenuItem value="Other">Other</MenuItem>
+              </TextField>
+
+              <TextField
+                margin="dense"
+                label="Notes (Optional)"
+                fullWidth
+                variant="outlined"
+                multiline
+                rows={2}
+                value={paymentNotes}
+                onChange={(e) => setPaymentNotes(e.target.value)}
+                placeholder="Add any notes about this payment..."
+              />
             </Box>
-          ) : (
-            <TableContainer sx={{ maxHeight: { xs: 'calc(100vh - 400px)', md: 'calc(100vh - 350px)' } }}>
-              <Table stickyHeader>
-                <TableHead>
-                  <TableRow>
-                    <TableCell sx={{ fontWeight: 600 }}>Order #</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
-                    <TableCell sx={{ fontWeight: 600, display: { xs: 'none', sm: 'table-cell' } }}>Items</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Total</TableCell>
-                    <TableCell sx={{ fontWeight: 600, display: { xs: 'none', md: 'table-cell' } }}>Status</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 600 }}>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {customerOrders
-                    .sort((a, b) => new Date(b.date) - new Date(a.date))
-                    .map((order) => (
-                      <TableRow
-                        key={order.id}
-                        hover
-                        sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
-                      >
-                        <TableCell>
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            #{order.orderNumber}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2">
-                            {formatDate(order.date)}
-                          </Typography>
-                        </TableCell>
-                        <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
-                          <Typography variant="body2">
-                            {order.items.length} items ({order.items.reduce((sum, item) => sum + item.quantity, 0)} units)
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main' }}>
-                            ₹{order.total.toFixed(2)}
-                          </Typography>
-                        </TableCell>
-                        <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>
-                          <Chip
-                            label={order.status}
-                            color={getStatusColor(order.status)}
-                            size="small"
-                          />
-                        </TableCell>
-                        <TableCell align="right">
-                          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                            <IconButton
-                              size="small"
-                              color="primary"
-                              onClick={() => router.push(`/orders/${order.id}`)}
-                              title="View Order"
-                            >
-                              <ViewIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton
-                              size="small"
-                              color="secondary"
-                              onClick={() => router.push(`/orders/${order.id}/edit`)}
-                              title="Edit Order"
-                            >
-                              <EditIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </Paper>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleClosePaymentDialog} disabled={isProcessing}>
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              onClick={handlePaymentSubmit}
+              disabled={isProcessing || !paymentAmount}
+            >
+              {isProcessing ? 'Processing...' : 'Record Payment'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Snackbar for notifications */}
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={4000}
+          onClose={handleSnackbarClose}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert
+            onClose={handleSnackbarClose}
+            severity={snackbar.severity}
+            sx={{ width: '100%' }}
+          >
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
+
       </Container>
     </Box>
   );

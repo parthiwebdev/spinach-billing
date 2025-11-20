@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useRouter } from 'next/navigation';
 import {
@@ -52,9 +52,17 @@ export default function Customers() {
   const router = useRouter();
   const dispatch = useDispatch();
   const [searchQuery, setSearchQuery] = useState('');
+  const nameInputRef = useRef(null);
 
   // Dialog states
   const [openDialog, setOpenDialog] = useState(false);
+
+  // Focus name input when dialog transition ends
+  const handleDialogEntered = () => {
+    if (nameInputRef.current) {
+      nameInputRef.current.focus();
+    }
+  };
   const [dialogMode, setDialogMode] = useState('create'); // 'create' or 'edit'
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -73,6 +81,8 @@ export default function Customers() {
     message: '',
     severity: 'success'
   });
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Get customers from Redux store
   const customersData = useSelector(selectAllCustomers);
@@ -138,6 +148,7 @@ export default function Customers() {
 
   // Handle form submit
   const handleSubmit = async () => {
+    setIsSaving(true);
     try {
       if (dialogMode === 'create') {
         await dispatch(createNewCustomer(formData));
@@ -161,6 +172,8 @@ export default function Customers() {
         message: `Error: ${err.message}`,
         severity: 'error'
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -173,6 +186,7 @@ export default function Customers() {
 
   // Handle delete confirm
   const handleDeleteConfirm = async () => {
+    setIsDeleting(true);
     try {
       await dispatch(deleteExistingCustomer(customerToDelete.id));
       setSnackbar({
@@ -188,6 +202,8 @@ export default function Customers() {
         message: `Error: ${err.message}`,
         severity: 'error'
       });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -197,7 +213,7 @@ export default function Customers() {
   };
 
   return (
-    <Box sx={{ bgcolor: 'background.default', minHeight: 'calc(100vh - 64px)', py: { xs: 2, md: 4 }, pb: { xs: 10, md: 4 } }}>
+    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: { xs: 2, md: 4 }, pb: { xs: 10, md: 4 } }}>
       <Container maxWidth="lg">
         {/* Header */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: { xs: 2, md: 4 }, px: { xs: 1, md: 0 } }}>
@@ -427,7 +443,13 @@ export default function Customers() {
       </Container>
 
       {/* Create/Edit Customer Dialog */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+      <Dialog
+        open={openDialog}
+        onClose={handleCloseDialog}
+        maxWidth="sm"
+        fullWidth
+        TransitionProps={{ onEntered: handleDialogEntered }}
+      >
         <DialogTitle>
           {dialogMode === 'create' ? 'Add New Customer' : 'Edit Customer'}
         </DialogTitle>
@@ -445,10 +467,12 @@ export default function Customers() {
               onChange={handleInputChange}
               fullWidth
               required
+              inputRef={nameInputRef}
             />
             <TextField
               label="Contact Number"
               name="phone"
+              type="number"
               value={formData.phone}
               onChange={handleInputChange}
               fullWidth
@@ -467,13 +491,13 @@ export default function Customers() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
+          <Button onClick={handleCloseDialog} disabled={isSaving}>Cancel</Button>
           <Button
             variant="contained"
             onClick={handleSubmit}
-            disabled={loading || !formData.name || !formData.phone}
+            disabled={isSaving || !formData.name || !formData.phone}
           >
-            {loading ? 'Saving...' : (dialogMode === 'create' ? 'Create' : 'Update')}
+            {isSaving ? 'Saving...' : (dialogMode === 'create' ? 'Create' : 'Update')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -488,14 +512,14 @@ export default function Customers() {
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
+          <Button onClick={() => setDeleteConfirmOpen(false)} disabled={isDeleting}>Cancel</Button>
           <Button
             variant="contained"
             color="error"
             onClick={handleDeleteConfirm}
-            disabled={loading}
+            disabled={isDeleting}
           >
-            {loading ? 'Deleting...' : 'Delete'}
+            {isDeleting ? 'Deleting...' : 'Delete'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -130,7 +130,7 @@ export default function Orders() {
   };
 
   return (
-    <Box sx={{ bgcolor: 'background.default', minHeight: 'calc(100vh - 64px)', py: { xs: 2, md: 4 }, pb: { xs: 10, md: 4 } }}>
+    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: { xs: 2, md: 4 }, pb: { xs: 10, md: 4 } }}>
       <Container maxWidth="lg">
         <Typography
           variant="h3"
@@ -226,27 +226,28 @@ export default function Orders() {
                     sx={{
                       fontWeight: 600,
                       fontSize: { xs: '0.75rem', md: '0.875rem' },
-                      width: { xs: '50%', sm: '60%' }
+                      width: '33.33%',
+                      textAlign: { xs: 'left', md: 'center' }
                     }}
                   >
                     Customer Name
                   </TableCell>
                   <TableCell
-                    align="center"
                     sx={{
                       fontWeight: 600,
                       fontSize: { xs: '0.75rem', md: '0.875rem' },
-                      width: { xs: '25%', sm: '20%' }
+                      width: '33.33%',
+                      textAlign: 'center'
                     }}
                   >
                     Items
                   </TableCell>
                   <TableCell
-                    align="center"
                     sx={{
                       fontWeight: 600,
                       fontSize: { xs: '0.75rem', md: '0.875rem' },
-                      width: { xs: '25%', sm: '20%' }
+                      width: '33.33%',
+                      textAlign: 'center'
                     }}
                   >
                     Actions
@@ -281,7 +282,7 @@ export default function Orders() {
                       }}
                       onClick={() => router.push(`/orders/${order.id}`)}
                     >
-                      <TableCell sx={{ py: { xs: 1.5, md: 2 } }}>
+                      <TableCell sx={{ py: { xs: 1.5, md: 2 }, textAlign: { xs: 'left', md: 'center' } }}>
                         <Typography
                           variant="body2"
                           sx={{

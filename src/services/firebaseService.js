@@ -197,6 +197,30 @@ export const updateProduct = async (productId, updates) => {
 };
 
 /**
+ * Bulk update product prices
+ */
+export const bulkUpdateProductPrices = async (productUpdates) => {
+  try {
+    const batch = writeBatch(db);
+
+    productUpdates.forEach(({ id, price }) => {
+      const productRef = doc(db, COLLECTIONS.PRODUCTS, id);
+      batch.update(productRef, {
+        price,
+        updatedAt: serverTimestamp()
+      });
+    });
+
+    await batch.commit();
+    console.log(`Bulk updated ${productUpdates.length} product prices`);
+    return { count: productUpdates.length };
+  } catch (error) {
+    console.error('Error bulk updating product prices:', error);
+    throw error;
+  }
+};
+
+/**
  * Real-time listener for all products
  */
 export const subscribeToProducts = (callback) => {
@@ -234,6 +258,10 @@ export const createOrder = async (orderData, customerId) => {
     console.log('Firebase createOrder called with:', { orderData, customerId });
     console.log('DB instance:', db);
 
+    // Get current customer balance for payment record
+    const customer = await getCustomerById(customerId);
+    const previousBalance = customer?.pendingBalance || 0;
+
     const batch = writeBatch(db);
 
     // 1. Create order document
@@ -243,6 +271,7 @@ export const createOrder = async (orderData, customerId) => {
     // Calculate order values
     const orderSubtotal = orderData.subtotal || orderData.total || 0;
     const remainingBalance = orderSubtotal; // New order is unpaid
+    const newBalance = previousBalance + orderSubtotal;
 
     const orderToSave = {
       ...orderData,
@@ -266,6 +295,22 @@ export const createOrder = async (orderData, customerId) => {
       totalOrders: increment(1),
       totalSpent: increment(orderSubtotal),
       updatedAt: serverTimestamp()
+    });
+
+    // 3. Create payment record for order (as pending/debit entry)
+    const paymentsRef = collection(db, COLLECTIONS.PAYMENTS);
+    const paymentRef = doc(paymentsRef);
+    batch.set(paymentRef, {
+      customerId,
+      orderId: orderRef.id,
+      type: 'order', // Distinguish from payment entries
+      amountPaid: -orderSubtotal, // Negative to indicate debit/pending
+      paymentMethod: 'Order',
+      notes: `Order #${orderData.orderNumber || orderRef.id}`,
+      previousBalance,
+      newBalance,
+      paymentDate: serverTimestamp(),
+      createdAt: serverTimestamp()
     });
 
     console.log('Committing batch...');
@@ -304,6 +349,50 @@ export const updateOrder = async (orderId, updates) => {
     return { id: orderId, ...updates };
   } catch (error) {
     console.error('Error updating order:', error);
+    throw error;
+  }
+};
+
+/**
+ * Delete order and update customer balance
+ */
+export const deleteOrder = async (orderId) => {
+  try {
+    // Get the order first to get customer info and amount
+    const order = await getOrderById(orderId);
+    if (!order) {
+      throw new Error('Order not found');
+    }
+
+    const batch = writeBatch(db);
+
+    // 1. Delete the order
+    const orderRef = doc(db, COLLECTIONS.ORDERS, orderId);
+    batch.delete(orderRef);
+
+    // 2. Update customer's pending balance (reduce by order amount)
+    const customerRef = doc(db, COLLECTIONS.CUSTOMERS, order.customerId);
+    const orderSubtotal = order.subtotal || order.total || 0;
+    batch.update(customerRef, {
+      pendingBalance: increment(-orderSubtotal),
+      totalOrders: increment(-1),
+      totalSpent: increment(-orderSubtotal),
+      updatedAt: serverTimestamp()
+    });
+
+    // 3. Delete related payment record if exists
+    const paymentsRef = collection(db, COLLECTIONS.PAYMENTS);
+    const paymentsQuery = query(paymentsRef, where('orderId', '==', orderId));
+    const paymentsSnapshot = await getDocs(paymentsQuery);
+    paymentsSnapshot.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+
+    await batch.commit();
+    console.log('Order deleted successfully:', orderId);
+    return { id: orderId };
+  } catch (error) {
+    console.error('Error deleting order:', error);
     throw error;
   }
 };
@@ -409,6 +498,7 @@ export const recordPayment = async (paymentData) => {
     batch.set(paymentRef, {
       customerId,
       orderId: orderId || null,
+      type: 'payment', // Add type field to distinguish from order entries
       amountPaid,
       paymentMethod,
       notes,

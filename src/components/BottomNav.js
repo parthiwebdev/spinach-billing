@@ -57,6 +57,12 @@ const BottomNav = () => {
     router.push(path);
   };
 
+  // Hide bottom nav on customer details page
+  const isCustomerDetailsPage = pathname?.match(/^\/customers\/[^/]+\/orders$/);
+  if (isCustomerDetailsPage) {
+    return null;
+  }
+
   return (
     <Box
       sx={{

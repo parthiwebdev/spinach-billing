@@ -1,6 +1,7 @@
 'use client';
 
-import { useSelector } from 'react-redux';
+import { useState } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Container,
@@ -9,22 +10,34 @@ import {
   Paper,
   Grid,
   Divider,
-  Chip,
   Button,
   List,
   ListItem,
-  ListItemAvatar,
   ListItemText,
-  Avatar,
   Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Snackbar,
 } from '@mui/material';
-import { ArrowBack as BackIcon, CheckCircle as CheckIcon, Edit as EditIcon } from '@mui/icons-material';
-import { selectOrderById, selectLatestOrder } from '../../../store/slices/ordersSlice';
+import { ArrowBack as BackIcon, CheckCircle as CheckIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { selectOrderById, selectLatestOrder, deleteOrder } from '../../../store/slices/ordersSlice';
 
 export default function OrderDetail() {
   const params = useParams();
   const router = useRouter();
+  const dispatch = useDispatch();
   const orderId = params.orderId;
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
 
   // Get both orders unconditionally (hooks must be called in the same order every render)
   const latestOrder = useSelector(selectLatestOrder);
@@ -34,6 +47,22 @@ export default function OrderDetail() {
   const order = orderId === 'latest' ? latestOrder : specificOrder;
 
   if (!order) {
+    // Don't show "not found" if we're deleting (redirect is in progress)
+    if (isDeleting) {
+      return (
+        <Container maxWidth="md" sx={{ py: 4 }}>
+          <Paper sx={{ p: 4, textAlign: 'center' }}>
+            <Typography variant="h5" gutterBottom>
+              Order deleted successfully
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Redirecting to orders list...
+            </Typography>
+          </Paper>
+        </Container>
+      );
+    }
+
     return (
       <Container maxWidth="md" sx={{ py: 4 }}>
         <Paper sx={{ p: 4, textAlign: 'center' }}>
@@ -59,23 +88,37 @@ export default function OrderDetail() {
     });
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'Processing':
-        return 'info';
-      case 'Shipped':
-        return 'primary';
-      case 'Delivered':
-        return 'success';
-      case 'Cancelled':
-        return 'error';
-      default:
-        return 'default';
+  const handleDeleteClick = () => {
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+  };
+
+  const handleDeleteConfirm = async () => {
+    setIsDeleting(true);
+    setDeleteDialogOpen(false);
+    try {
+      await dispatch(deleteOrder(order.id));
+      // Redirect immediately to orders list
+      router.push('/orders');
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: `Error: ${err.message}`,
+        severity: 'error'
+      });
+      setIsDeleting(false);
     }
   };
 
+  const handleSnackbarClose = () => {
+    setSnackbar(prev => ({ ...prev, open: false }));
+  };
+
   return (
-    <Box sx={{ bgcolor: 'background.default', minHeight: 'calc(100vh - 64px)', py: 4 }}>
+    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: 4 }}>
       <Container maxWidth="lg">
         <Button
           startIcon={<BackIcon />}
@@ -117,7 +160,6 @@ export default function OrderDetail() {
                   Placed on {formatDate(order.date)}
                 </Typography>
               </Box>
-              <Chip label={order.status} color={getStatusColor(order.status)} />
             </Box>
           </Box>
 
@@ -154,13 +196,9 @@ export default function OrderDetail() {
                 Order Summary
               </Typography>
               <Box sx={{ mt: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                   <Typography variant="body2">Subtotal</Typography>
                   <Typography variant="body2">₹{order.subtotal.toFixed(2)}</Typography>
-                </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                  <Typography variant="body2">Shipping</Typography>
-                  <Typography variant="body2">₹{(order.shipping || 0).toFixed(2)}</Typography>
                 </Box>
                 <Divider />
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
@@ -192,7 +230,7 @@ export default function OrderDetail() {
                   }
                   secondary={
                     <Typography variant="body2" color="text.secondary">
-                      {item.quantity} × ₹{item.price.toFixed(2)} per {item.unit}
+                      {item.quantity} × ₹{item.price.toFixed(2)}
                     </Typography>
                   }
                 />
@@ -203,22 +241,78 @@ export default function OrderDetail() {
             ))}
           </List>
 
-          <Box sx={{ mt: 4, display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-            <Button variant="outlined" onClick={() => router.push('/products')}>
-              Continue Shopping
-            </Button>
+          <Box sx={{ mt: 4, display: 'flex', gap: 2, justifyContent: 'space-between' }}>
             <Button
               variant="outlined"
-              startIcon={<EditIcon />}
-              onClick={() => router.push(`/orders/${order.id}/edit`)}
+              color="error"
+              startIcon={<DeleteIcon />}
+              onClick={handleDeleteClick}
             >
-              Edit Order
+              Delete Order
             </Button>
-            <Button variant="contained" onClick={() => router.push('/orders')}>
-              View All Orders
-            </Button>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <Button variant="outlined" onClick={() => router.push('/products')}>
+                Continue Shopping
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<EditIcon />}
+                onClick={() => router.push(`/orders/${order.id}/edit`)}
+              >
+                Edit Order
+              </Button>
+              <Button variant="contained" onClick={() => router.push('/orders')}>
+                View All Orders
+              </Button>
+            </Box>
           </Box>
         </Paper>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={deleteDialogOpen} onClose={handleDeleteCancel}>
+          <DialogTitle>Delete Order</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Are you sure you want to delete order <strong>#{order.orderNumber}</strong>?
+              <br /><br />
+              This will:
+              <br />• Remove the order from the system
+              <br />• Update customer's pending balance
+              <br />• Delete related payment records
+              <br /><br />
+              This action cannot be undone.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleDeleteCancel} disabled={isDeleting}>
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              color="error"
+              onClick={handleDeleteConfirm}
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Deleting...' : 'Delete Order'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Snackbar for notifications */}
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={4000}
+          onClose={handleSnackbarClose}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert
+            onClose={handleSnackbarClose}
+            severity={snackbar.severity}
+            sx={{ width: '100%' }}
+          >
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
       </Container>
     </Box>
   );

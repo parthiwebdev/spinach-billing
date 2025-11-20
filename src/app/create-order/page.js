@@ -29,26 +29,28 @@ import {
   Receipt as ReceiptIcon,
   ShoppingCart as CartIcon,
 } from '@mui/icons-material';
+import CircularProgress from '@mui/material/CircularProgress';
 import { selectAllCustomers, selectCustomersSynced } from '../../store/slices/customersSlice';
-import { createOrderWithBalance, selectOrdersLoading } from '../../store/slices/ordersSlice';
-import { spinachProducts } from '../../data/spinachProducts';
+import { createOrderWithBalance } from '../../store/slices/ordersSlice';
+import { selectAllProducts, selectProductsSynced } from '../../store/slices/productsSlice';
 
 export default function CreateOrder() {
   const dispatch = useDispatch();
   const router = useRouter();
   const customers = useSelector(selectAllCustomers);
-  const loading = useSelector(selectOrdersLoading);
   const customersSynced = useSelector(selectCustomersSynced);
+  const products = useSelector(selectAllProducts);
+  const productsSynced = useSelector(selectProductsSynced);
 
   const isLoadingCustomers = !customersSynced;
+  const isLoadingProducts = !productsSynced;
 
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [productQuantities, setProductQuantities] = useState({});
-
-  const SHIPPING_FEE = 5.99;
+  const [isCreating, setIsCreating] = useState(false);
 
   // Get order items from product quantities
-  const orderItems = spinachProducts
+  const orderItems = products
     .filter((product) => productQuantities[product.id] > 0)
     .map((product) => ({
       productId: product.id,
@@ -61,7 +63,7 @@ export default function CreateOrder() {
 
   // Calculate totals
   const subtotal = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const total = subtotal + SHIPPING_FEE;
+  const total = subtotal;
 
   // Handle quantity change
   const handleQuantityChange = (productId, change) => {
@@ -72,19 +74,52 @@ export default function CreateOrder() {
     });
   };
 
-  // Handle direct input
+  // Handle direct input - allow temporary empty string for better UX
   const handleQuantityInput = (productId, value) => {
-    const qty = parseInt(value) || 0;
+    // Allow empty string temporarily for typing
+    if (value === '') {
+      setProductQuantities((prev) => ({
+        ...prev,
+        [productId]: ''
+      }));
+      return;
+    }
+
+    const parsedQty = parseInt(value);
+
+    // If user enters 0 or negative, set to 1
+    const finalQty = isNaN(parsedQty) || parsedQty <= 0 ? 1 : parsedQty;
+
     setProductQuantities((prev) => ({
       ...prev,
-      [productId]: Math.max(0, qty),
+      [productId]: finalQty,
     }));
+  };
+
+  // Handle blur - enforce minimum value
+  const handleQuantityBlur = (productId) => {
+    const currentQty = productQuantities[productId];
+
+    // On blur, if empty or invalid, set to 0 (no selection)
+    if (currentQty === '' || currentQty === null || currentQty === undefined) {
+      setProductQuantities((prev) => ({
+        ...prev,
+        [productId]: 0
+      }));
+    } else if (currentQty <= 0 && currentQty !== 0) {
+      // If invalid but not explicitly 0, set to 0
+      setProductQuantities((prev) => ({
+        ...prev,
+        [productId]: 0
+      }));
+    }
   };
 
   // Create order
   const handleCreateOrder = async () => {
     if (!selectedCustomer || orderItems.length === 0) return;
 
+    setIsCreating(true);
     try {
       // Build customerInfo, filtering out undefined values
       const customerInfo = {
@@ -101,7 +136,6 @@ export default function CreateOrder() {
         customerInfo,
         items: orderItems,
         subtotal,
-        shipping: SHIPPING_FEE,
         total,
       };
 
@@ -118,11 +152,12 @@ export default function CreateOrder() {
       router.push(`/orders/${order.id}`);
     } catch (error) {
       console.error('Error creating order:', error);
+      setIsCreating(false);
     }
   };
 
   return (
-    <Box sx={{ bgcolor: 'background.default', minHeight: 'calc(100vh - 64px)', py: { xs: 2, md: 4 }, pb: { xs: 10, md: 4 } }}>
+    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: { xs: 2, md: 4 }, pb: { xs: 10, md: 4 } }}>
       <Container maxWidth="xl">
         <Box sx={{ display: 'flex', alignItems: 'center', mb: { xs: 2, md: 4 }, px: { xs: 1, md: 0 } }}>
           <ReceiptIcon sx={{ fontSize: { xs: 32, md: 40 }, mr: 2, color: 'primary.main' }} />
@@ -153,6 +188,7 @@ export default function CreateOrder() {
               getOptionLabel={(option) =>
                 `${option.name} - ${option.phone.replace(/^\(\d{3}\)\s/, '')}`
               }
+              getOptionKey={(option) => option.id}
               renderInput={(params) => (
                 <TextField
                   {...params}
@@ -237,7 +273,7 @@ export default function CreateOrder() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {spinachProducts.map((product) => {
+                    {products.map((product) => {
                       const qty = productQuantities[product.id] || 0;
                       const itemTotal = product.price * qty;
                       return (
@@ -311,6 +347,7 @@ export default function CreateOrder() {
                               <TextField
                                 value={qty}
                                 onChange={(e) => handleQuantityInput(product.id, e.target.value)}
+                                onBlur={() => handleQuantityBlur(product.id)}
                                 type="number"
                                 slotProps={{
                                   input: {
@@ -427,14 +464,9 @@ export default function CreateOrder() {
                     </Typography>
                   </Box>
 
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                     <Typography variant="body1">Subtotal</Typography>
                     <Typography variant="body1">₹{subtotal.toFixed(2)}</Typography>
-                  </Box>
-
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                    <Typography variant="body1">Shipping</Typography>
-                    <Typography variant="body1">₹{SHIPPING_FEE.toFixed(2)}</Typography>
                   </Box>
 
                   <Divider sx={{ my: 2 }} />
@@ -461,10 +493,10 @@ export default function CreateOrder() {
                 size="large"
                 fullWidth
                 onClick={handleCreateOrder}
-                disabled={loading || !selectedCustomer || orderItems.length === 0}
-                startIcon={<ReceiptIcon />}
+                disabled={isCreating || !selectedCustomer || orderItems.length === 0}
+                startIcon={isCreating ? <CircularProgress size={20} color="inherit" /> : <ReceiptIcon />}
               >
-                {loading ? 'Creating Order...' : 'Create Order & Generate Bill'}
+                {isCreating ? 'Creating Order...' : 'Create Order & Generate Bill'}
               </Button>
 
               {(!selectedCustomer || orderItems.length === 0) && (

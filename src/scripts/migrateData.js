@@ -10,7 +10,7 @@
  * 3. Run this script standalone: node src/scripts/migrateData.js
  */
 
-import { spinachProducts } from '../data/spinachProducts';
+import { vegetableProducts } from '../data/vegetableProducts';
 import { customersData } from '../data/customersData';
 import {
   bulkCreateProducts,
@@ -38,11 +38,11 @@ const COLLECTIONS_NAMES = {
 const transformProductsForFirebase = (products) => {
   return products.map(product => ({
     name: product.name,
-    category: product.category,
     price: product.price,
-    unit: product.unit,
-    description: product.description,
-    image: product.image,
+    category: product.category || 'Fresh',
+    unit: product.unit || 'kg',
+    description: product.description || product.name,
+    image: product.image || 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=500&h=500&fit=crop',
     inStock: product.inStock !== undefined ? product.inStock : true
   }));
 };
@@ -239,7 +239,7 @@ export const migrateAllData = async () => {
     console.log('Starting data migration...');
 
     // Transform data
-    const productsToMigrate = transformProductsForFirebase(spinachProducts);
+    const productsToMigrate = transformProductsForFirebase(vegetableProducts);
     const customersToMigrate = transformCustomersForFirebase(customersData);
 
     console.log(`Migrating ${productsToMigrate.length} products...`);
@@ -252,7 +252,7 @@ export const migrateAllData = async () => {
 
     // Create sample orders
     console.log('Creating sample orders...');
-    const orders = await createSampleOrders(customersResult.ids, spinachProducts);
+    const orders = await createSampleOrders(customersResult.ids, vegetableProducts);
     console.log(`Orders created: ${orders.length} orders`);
 
     // Update customer balances
@@ -279,7 +279,7 @@ export const migrateAllData = async () => {
 export const migrateProducts = async () => {
   try {
     console.log('Starting products migration...');
-    const productsToMigrate = transformProductsForFirebase(spinachProducts);
+    const productsToMigrate = transformProductsForFirebase(vegetableProducts);
     const result = await bulkCreateProducts(productsToMigrate);
     console.log(`Products migration complete: ${result.count} products added`);
     return result;

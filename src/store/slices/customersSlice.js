@@ -221,12 +221,12 @@ export const updateCustomerBalance = (customerId, balanceChange) => async (dispa
  */
 export const createNewCustomer = (customerData) => async (dispatch) => {
   try {
-    dispatch(setLoading(true));
     dispatch(clearError());
 
     const result = await createCustomer(customerData);
-    dispatch(addCustomer(result));
-    dispatch(setLoading(false));
+    // Note: addCustomer is not dispatched here because the Firebase
+    // real-time listener will automatically update the state when the customer
+    // is created in Firebase
 
     return result;
   } catch (error) {
@@ -241,12 +241,12 @@ export const createNewCustomer = (customerData) => async (dispatch) => {
  */
 export const updateExistingCustomer = (customerId, updates) => async (dispatch) => {
   try {
-    dispatch(setLoading(true));
     dispatch(clearError());
 
     const result = await updateCustomer(customerId, updates);
-    dispatch(updateCustomerLocal({ id: customerId, ...updates }));
-    dispatch(setLoading(false));
+    // Note: updateCustomerLocal is not dispatched here because the Firebase
+    // real-time listener will automatically update the state when the customer
+    // is updated in Firebase
 
     return result;
   } catch (error) {
@@ -261,12 +261,12 @@ export const updateExistingCustomer = (customerId, updates) => async (dispatch) 
  */
 export const deleteExistingCustomer = (customerId) => async (dispatch) => {
   try {
-    dispatch(setLoading(true));
     dispatch(clearError());
 
     await deleteCustomer(customerId);
-    dispatch(removeCustomerLocal(customerId));
-    dispatch(setLoading(false));
+    // Note: removeCustomerLocal is not dispatched here because the Firebase
+    // real-time listener will automatically update the state when the customer
+    // is deleted from Firebase
 
     return { id: customerId, deleted: true };
   } catch (error) {

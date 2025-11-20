@@ -1,5 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit';
-import { spinachProducts } from '../../data/spinachProducts';
+import { vegetableProducts } from '../../data/vegetableProducts';
 import {
   createProduct,
   updateProduct,
@@ -10,7 +10,7 @@ import {
 let productsListener = null;
 
 const initialState = {
-  items: spinachProducts,
+  items: vegetableProducts,
   selectedCategory: 'All',
   searchQuery: '',
   loading: false,

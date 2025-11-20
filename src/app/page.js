@@ -32,7 +32,7 @@ export default function Home() {
   }).length;
 
   return (
-    <Box sx={{ bgcolor: 'background.default', minHeight: 'calc(100vh - 64px)', py: { xs: 2, md: 4 }, pb: { xs: 10, md: 4 } }}>
+    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: { xs: 2, md: 4 }, pb: { xs: 10, md: 4 } }}>
       <Container maxWidth="lg">
         {/* Header */}
         <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 700, mb: 4, fontSize: { xs: '1.75rem', md: '3rem' } }}>

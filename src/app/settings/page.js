@@ -59,7 +59,7 @@ export default function Settings() {
   };
 
   return (
-    <Box sx={{ bgcolor: 'background.default', minHeight: 'calc(100vh - 64px)', py: { xs: 2, md: 4 }, pb: { xs: 10, md: 4 } }}>
+    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: { xs: 2, md: 4 }, pb: { xs: 10, md: 4 } }}>
       <Container maxWidth="md">
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
           <SettingsIcon sx={{ fontSize: 40, mr: 2, color: 'primary.main' }} />
@@ -124,7 +124,7 @@ export default function Settings() {
             <ListItem>
               <ListItemText
                 primary="Application Name"
-                secondary="Spinach Billing System"
+                secondary="Vegetables Billing System"
               />
             </ListItem>
 

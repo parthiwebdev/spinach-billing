@@ -2,9 +2,11 @@ import { createSlice } from '@reduxjs/toolkit';
 import {
   createOrder as createOrderFirebase,
   updateOrder as updateOrderFirebase,
+  deleteOrder as deleteOrderFirebase,
   subscribeToOrders,
   subscribeToCustomerOrders
 } from '@/services/firebaseService';
+import { addPayment } from './paymentsSlice';
 
 // Store listeners outside of Redux state (not serializable)
 let ordersListener = null;
@@ -53,6 +55,11 @@ const ordersSlice = createSlice({
       if (order) {
         Object.assign(order, updates);
       }
+    },
+
+    // Remove order from local state
+    removeOrderLocal: (state, action) => {
+      state.orders = state.orders.filter(o => o.id !== action.payload);
     },
 
     // Legacy reducer for backward compatibility
@@ -131,6 +138,7 @@ export const {
   setCustomerOrders,
   addOrder,
   updateOrderLocal,
+  removeOrderLocal,
   createOrder,
   linkOrderToCustomer,
   updateOrderStatus,
@@ -205,8 +213,24 @@ export const createOrderWithBalance = (orderData, customerId, customerPendingBal
       // Create order in Firebase (also updates customer balance)
       const order = await createOrderFirebase(orderWithBalance, customerId);
 
-      // Optimistically add to local state
+      // Optimistically add order to local state
       dispatch(addOrder(order));
+
+      // Optimistically add payment entry to local state (for transaction history)
+      const paymentEntry = {
+        id: `temp-${Date.now()}`, // Temporary ID until Firebase updates
+        customerId,
+        orderId: order.id,
+        type: 'order',
+        amountPaid: -subtotal, // Negative to indicate debit
+        paymentMethod: 'Order',
+        notes: `Order #${orderData.orderNumber || order.id}`,
+        previousBalance: previousPendingBalance,
+        newBalance: previousPendingBalance + subtotal,
+        paymentDate: new Date().toISOString(),
+        createdAt: new Date().toISOString()
+      };
+      dispatch(addPayment(paymentEntry));
 
       dispatch(setLoading(false));
       return order;
@@ -232,6 +256,28 @@ export const modifyOrder = (orderId, updates) => async (dispatch) => {
     dispatch(setLoading(false));
   } catch (error) {
     console.error('Error modifying order:', error);
+    dispatch(setError(error.message));
+    throw error;
+  }
+};
+
+/**
+ * Delete order
+ */
+export const deleteOrder = (orderId) => async (dispatch) => {
+  try {
+    dispatch(setLoading(true));
+    dispatch(clearError());
+
+    await deleteOrderFirebase(orderId);
+
+    // Optimistically remove from local state
+    dispatch(removeOrderLocal(orderId));
+
+    dispatch(setLoading(false));
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting order:', error);
     dispatch(setError(error.message));
     throw error;
   }

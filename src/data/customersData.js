@@ -1,4 +1,4 @@
-// Sample customer data for Spinach Billing
+// Sample customer data for Vegetables Billing
 export const customersData = [
   {
     id: 1,

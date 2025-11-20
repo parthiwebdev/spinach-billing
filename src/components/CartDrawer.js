@@ -125,7 +125,7 @@ const CartDrawer = () => {
                           {item.name}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          ₹{item.price.toFixed(2)} per {item.unit}
+                          ₹{item.price.toFixed(2)}
                         </Typography>
                         <Typography variant="subtitle2" color="primary" sx={{ mt: 0.5 }}>
                           ₹{(item.price * item.quantity).toFixed(2)}

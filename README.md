@@ -1,4 +1,4 @@
-# Spinach Billing Application
+# Vegetables Billing Application
 
 A modern, full-featured billing and customer management system built with Next.js, Firebase, and Redux Toolkit. Designed specifically for spinach product businesses with real-time inventory, order management, and payment tracking.
 

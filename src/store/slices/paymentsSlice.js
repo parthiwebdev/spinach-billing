@@ -36,7 +36,13 @@ const paymentsSlice = createSlice({
 
     // Add a new payment to local state (optimistic update)
     addPayment: (state, action) => {
-      state.payments.unshift(action.payload);
+      const payment = action.payload;
+      state.payments.unshift(payment);
+
+      // Also add to customer-specific payments if customerId exists
+      if (payment.customerId && state.customerPayments[payment.customerId]) {
+        state.customerPayments[payment.customerId].unshift(payment);
+      }
     },
 
     // Set loading state

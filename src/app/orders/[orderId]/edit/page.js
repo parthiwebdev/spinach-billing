@@ -28,7 +28,7 @@ import {
   ArrowBack as BackIcon,
 } from '@mui/icons-material';
 import { selectOrderById, modifyOrder, selectOrdersLoading } from '../../../../store/slices/ordersSlice';
-import { spinachProducts } from '../../../../data/spinachProducts';
+import { selectAllProducts } from '../../../../store/slices/productsSlice';
 
 export default function EditOrder() {
   const dispatch = useDispatch();
@@ -38,6 +38,7 @@ export default function EditOrder() {
 
   const order = useSelector(selectOrderById(orderId));
   const loading = useSelector(selectOrdersLoading);
+  const products = useSelector(selectAllProducts);
   const [productQuantities, setProductQuantities] = useState({});
 
   const SHIPPING_FEE = 5.99;
@@ -69,7 +70,7 @@ export default function EditOrder() {
   }
 
   // Get order items from product quantities
-  const orderItems = spinachProducts
+  const orderItems = products
     .filter((product) => productQuantities[product.id] > 0)
     .map((product) => ({
       productId: product.id,
@@ -125,7 +126,7 @@ export default function EditOrder() {
   };
 
   return (
-    <Box sx={{ bgcolor: 'background.default', minHeight: 'calc(100vh - 64px)', py: { xs: 2, md: 4 }, pb: { xs: 10, md: 4 } }}>
+    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: { xs: 2, md: 4 }, pb: { xs: 10, md: 4 } }}>
       <Container maxWidth="xl">
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, px: { xs: 1, md: 0 } }}>
           <Button
@@ -226,7 +227,7 @@ export default function EditOrder() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {spinachProducts.map((product) => {
+                    {products.map((product) => {
                       const qty = productQuantities[product.id] || 0;
                       const itemTotal = product.price * qty;
                       return (

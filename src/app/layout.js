@@ -16,8 +16,8 @@ const instrumentSans = Instrument_Sans({
 });
 
 export const metadata = {
-  title: 'Spinach Billing',
-  description: 'Spinach Billing Application',
+  title: 'Vegetables Billing',
+  description: 'Vegetables Billing Application',
   manifest: '/manifest.json',
   icons: {
     icon: '/favicon.ico',
