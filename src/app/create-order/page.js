@@ -22,12 +22,14 @@ import {
   TableHead,
   TableRow,
   Skeleton,
+  InputAdornment,
 } from '@mui/material';
 import {
   Add as AddIcon,
   Remove as RemoveIcon,
   Receipt as ReceiptIcon,
   ShoppingCart as CartIcon,
+  Search as SearchIcon,
 } from '@mui/icons-material';
 import CircularProgress from '@mui/material/CircularProgress';
 import { selectAllCustomers, selectCustomersSynced } from '../../store/slices/customersSlice';
@@ -48,6 +50,14 @@ export default function CreateOrder() {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [productQuantities, setProductQuantities] = useState({});
   const [isCreating, setIsCreating] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Filter products based on search query
+  const filteredProducts = products.filter((product) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return product.name.toLowerCase().includes(query);
+  });
 
   // Get order items from product quantities
   const orderItems = products
@@ -87,13 +97,13 @@ export default function CreateOrder() {
 
     const parsedQty = parseInt(value);
 
-    // If user enters 0 or negative, set to 1
-    const finalQty = isNaN(parsedQty) || parsedQty <= 0 ? 1 : parsedQty;
-
-    setProductQuantities((prev) => ({
-      ...prev,
-      [productId]: finalQty,
-    }));
+    // Store the parsed value directly (allow any number while typing)
+    if (!isNaN(parsedQty)) {
+      setProductQuantities((prev) => ({
+        ...prev,
+        [productId]: parsedQty,
+      }));
+    }
   };
 
   // Handle blur - enforce minimum value
@@ -106,8 +116,8 @@ export default function CreateOrder() {
         ...prev,
         [productId]: 0
       }));
-    } else if (currentQty <= 0 && currentQty !== 0) {
-      // If invalid but not explicitly 0, set to 0
+    } else if (currentQty < 0) {
+      // If negative, set to 0
       setProductQuantities((prev) => ({
         ...prev,
         [productId]: 0
@@ -221,9 +231,41 @@ export default function CreateOrder() {
             {/* Products Table */}
             <Paper sx={{ p: 0, overflow: 'hidden' }}>
               <Box sx={{ p: 3, pb: 2 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
                   Add Products to Order
                 </Typography>
+                {/* Search Bar */}
+                <TextField
+                  fullWidth
+                  placeholder="Search products by name..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  size="small"
+                  slotProps={{
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon color="action" />
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2
+                    }
+                  }}
+                />
+                {searchQuery && (
+                  <Box sx={{ mt: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Found {filteredProducts.length} product(s)
+                    </Typography>
+                    <Button size="small" onClick={() => setSearchQuery('')}>
+                      Clear
+                    </Button>
+                  </Box>
+                )}
               </Box>
               <TableContainer sx={{ overflowX: 'visible' }}>
                 <Table sx={{ width: '100%' }}>
@@ -273,22 +315,23 @@ export default function CreateOrder() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {products.map((product) => {
-                      const qty = productQuantities[product.id] || 0;
-                      const itemTotal = product.price * qty;
-                      return (
-                        <TableRow
-                          key={product.id}
-                          sx={{
-                            bgcolor: qty > 0 ? 'action.selected' : 'inherit',
-                            '&:hover': { bgcolor: 'action.hover' },
-                          }}
-                        >
+                    {filteredProducts.length > 0 ? (
+                      filteredProducts.map((product) => {
+                        const qty = productQuantities[product.id] !== undefined ? productQuantities[product.id] : 0;
+                        const itemTotal = product.price * (typeof qty === 'number' ? qty : 0);
+                        return (
+                          <TableRow
+                            key={product.id}
+                            sx={{
+                              bgcolor: (typeof qty === 'number' && qty > 0) ? 'action.selected' : 'inherit',
+                              '&:hover': { bgcolor: 'action.hover' },
+                            }}
+                          >
                           <TableCell sx={{ py: { xs: 1, md: 2 } }}>
                             <Typography
                               variant="body2"
                               sx={{
-                                fontWeight: qty > 0 ? 600 : 400,
+                                fontWeight: (typeof qty === 'number' && qty > 0) ? 600 : 400,
                                 fontSize: { xs: '0.75rem', md: '0.875rem' }
                               }}
                             >
@@ -303,7 +346,7 @@ export default function CreateOrder() {
                               }}
                             >
                               ₹{product.price.toFixed(2)}
-                              {qty > 0 && ` • Total: ₹${itemTotal.toFixed(2)}`}
+                              {(typeof qty === 'number' && qty > 0) && ` • Total: ₹${itemTotal.toFixed(2)}`}
                             </Typography>
                           </TableCell>
                           <TableCell
@@ -335,7 +378,7 @@ export default function CreateOrder() {
                               <IconButton
                                 size="small"
                                 onClick={() => handleQuantityChange(product.id, -1)}
-                                disabled={qty === 0}
+                                disabled={!qty || qty === 0}
                                 sx={{
                                   bgcolor: 'action.hover',
                                   width: { xs: 28, md: 32 },
@@ -384,7 +427,7 @@ export default function CreateOrder() {
                               py: { xs: 1, md: 2 }
                             }}
                           >
-                            {qty > 0 ? (
+                            {(typeof qty === 'number' && qty > 0) ? (
                               <Typography
                                 variant="body2"
                                 color="primary"
@@ -407,7 +450,20 @@ export default function CreateOrder() {
                           </TableCell>
                         </TableRow>
                       );
-                    })}
+                    })) : (
+                      <TableRow>
+                        <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
+                          <Typography variant="body1" color="text.secondary">
+                            {searchQuery ? `No products found matching "${searchQuery}"` : 'No products available'}
+                          </Typography>
+                          {searchQuery && (
+                            <Button size="small" onClick={() => setSearchQuery('')} sx={{ mt: 1 }}>
+                              Clear Search
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </TableContainer>

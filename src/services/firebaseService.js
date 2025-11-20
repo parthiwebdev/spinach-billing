@@ -197,6 +197,20 @@ export const updateProduct = async (productId, updates) => {
 };
 
 /**
+ * Delete product
+ */
+export const deleteProduct = async (productId) => {
+  try {
+    const productRef = doc(db, COLLECTIONS.PRODUCTS, productId);
+    await deleteDoc(productRef);
+    return { id: productId, deleted: true };
+  } catch (error) {
+    console.error('Error deleting product:', error);
+    throw error;
+  }
+};
+
+/**
  * Bulk update product prices
  */
 export const bulkUpdateProductPrices = async (productUpdates) => {

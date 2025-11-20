@@ -1,7 +1,7 @@
 'use client';
 
 import { useSelector } from 'react-redux';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Container,
   Typography,
@@ -17,20 +17,46 @@ import {
   Button,
   Snackbar,
   Alert,
+  InputAdornment,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
-import { Save as SaveIcon } from '@mui/icons-material';
+import {
+  Save as SaveIcon,
+  Search as SearchIcon,
+  Add as AddIcon,
+  Delete as DeleteIcon
+} from '@mui/icons-material';
 import { selectAllProducts } from '@/store/slices/productsSlice';
-import { bulkUpdateProductPrices } from '@/services/firebaseService';
+import { bulkUpdateProductPrices, createProduct, deleteProduct } from '@/services/firebaseService';
 
 export default function Products() {
   const products = useSelector(selectAllProducts);
   const [editedPrices, setEditedPrices] = useState({});
   const [isSaving, setIsSaving] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
     severity: 'success'
   });
+
+  // Add product dialog state
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [newProduct, setNewProduct] = useState({
+    name: '',
+    price: ''
+  });
+  const [isAdding, setIsAdding] = useState(false);
+  const productNameInputRef = useRef(null);
+
+  // Delete product dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Initialize edited prices when products load
   useEffect(() => {
@@ -79,6 +105,17 @@ export default function Products() {
       }));
     }
   };
+
+  // Filter products based on search query
+  const filteredProducts = products.filter(product => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      product.name.toLowerCase().includes(query) ||
+      (product.description && product.description.toLowerCase().includes(query)) ||
+      (product.category && product.category.toLowerCase().includes(query))
+    );
+  });
 
   const hasChanges = () => {
     return products.some(product =>
@@ -135,6 +172,108 @@ export default function Products() {
     setSnackbar(prev => ({ ...prev, open: false }));
   };
 
+  // Add product handlers
+  const handleAddClick = () => {
+    setAddDialogOpen(true);
+    setNewProduct({ name: '', price: '' });
+  };
+
+  const handleAddCancel = () => {
+    setAddDialogOpen(false);
+    setNewProduct({ name: '', price: '' });
+  };
+
+  // Handle dialog transition end to focus input
+  const handleDialogEntered = () => {
+    // Use setTimeout to ensure the dialog is fully rendered
+    setTimeout(() => {
+      if (productNameInputRef.current) {
+        productNameInputRef.current.focus();
+      }
+    }, 50);
+  };
+
+  const handleAddSubmit = async () => {
+    if (!newProduct.name || !newProduct.price) {
+      setSnackbar({
+        open: true,
+        message: 'Name and price are required',
+        severity: 'error'
+      });
+      return;
+    }
+
+    const price = parseFloat(newProduct.price);
+    if (isNaN(price) || price <= 0) {
+      setSnackbar({
+        open: true,
+        message: 'Price must be a valid number greater than 0',
+        severity: 'error'
+      });
+      return;
+    }
+
+    setIsAdding(true);
+    try {
+      await createProduct({
+        name: newProduct.name.trim(),
+        price: price,
+        category: 'Vegetables',
+        description: '',
+        inStock: true
+      });
+
+      setSnackbar({
+        open: true,
+        message: `Product "${newProduct.name}" added successfully!`,
+        severity: 'success'
+      });
+      handleAddCancel();
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: `Error adding product: ${error.message}`,
+        severity: 'error'
+      });
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
+  // Delete product handlers
+  const handleDeleteClick = (product) => {
+    setProductToDelete(product);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setProductToDelete(null);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!productToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      await deleteProduct(productToDelete.id);
+      setSnackbar({
+        open: true,
+        message: `Product "${productToDelete.name}" deleted successfully!`,
+        severity: 'success'
+      });
+      handleDeleteCancel();
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: `Error deleting product: ${error.message}`,
+        severity: 'error'
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: { xs: 2, md: 4 }, pb: { xs: 10, md: 4 } }}>
       <Container maxWidth="lg">
@@ -148,16 +287,61 @@ export default function Products() {
               Vegetables products list with prices
             </Typography>
           </Box>
-          <Button
-            variant="contained"
-            startIcon={<SaveIcon />}
-            onClick={handleSave}
-            disabled={isSaving || !hasChanges()}
-            sx={{ height: 'fit-content' }}
-          >
-            {isSaving ? 'Saving...' : 'Save Prices'}
-          </Button>
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            <Button
+              variant="outlined"
+              startIcon={<AddIcon />}
+              onClick={handleAddClick}
+              sx={{ height: 'fit-content' }}
+            >
+              Add Product
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<SaveIcon />}
+              onClick={handleSave}
+              disabled={isSaving || !hasChanges()}
+              sx={{ height: 'fit-content' }}
+            >
+              {isSaving ? 'Saving...' : 'Save Prices'}
+            </Button>
+          </Box>
         </Box>
+
+        {/* Search Bar */}
+        <Paper sx={{ p: 2, mb: 3 }}>
+          <TextField
+            fullWidth
+            placeholder="Search products by name, description, or category..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            size="small"
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon color="action" />
+                  </InputAdornment>
+                ),
+              },
+            }}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2
+              }
+            }}
+          />
+          {searchQuery && (
+            <Box sx={{ mt: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="body2" color="text.secondary">
+                Found {filteredProducts.length} of {products.length} products
+              </Typography>
+              <Button size="small" onClick={() => setSearchQuery('')}>
+                Clear
+              </Button>
+            </Box>
+          )}
+        </Paper>
 
         {/* Products Table */}
         <TableContainer component={Paper}>
@@ -168,7 +352,7 @@ export default function Products() {
                   sx={{
                     fontWeight: 600,
                     fontSize: { xs: '0.75rem', md: '0.875rem' },
-                    width: '60%',
+                    width: '50%',
                     textAlign: { xs: 'left', md: 'center' }
                   }}
                 >
@@ -178,17 +362,27 @@ export default function Products() {
                   sx={{
                     fontWeight: 600,
                     fontSize: { xs: '0.75rem', md: '0.875rem' },
-                    width: '40%',
+                    width: '30%',
                     textAlign: { xs: 'right', md: 'center' }
                   }}
                 >
                   Price
                 </TableCell>
+                <TableCell
+                  sx={{
+                    fontWeight: 600,
+                    fontSize: { xs: '0.75rem', md: '0.875rem' },
+                    width: '20%',
+                    textAlign: 'center'
+                  }}
+                >
+                  Actions
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {products.length > 0 ? (
-                products.map((product) => (
+              {filteredProducts.length > 0 ? (
+                filteredProducts.map((product) => (
                   <TableRow
                     key={product.id}
                     sx={{
@@ -224,14 +418,28 @@ export default function Products() {
                         }}
                       />
                     </TableCell>
+                    <TableCell sx={{ textAlign: 'center' }}>
+                      <IconButton
+                        color="error"
+                        onClick={() => handleDeleteClick(product)}
+                        size="small"
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={2} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={3} align="center" sx={{ py: 4 }}>
                     <Typography variant="body1" color="text.secondary">
-                      No products found
+                      {searchQuery ? `No products found matching "${searchQuery}"` : 'No products found'}
                     </Typography>
+                    {searchQuery && (
+                      <Button size="small" onClick={() => setSearchQuery('')} sx={{ mt: 1 }}>
+                        Clear Search
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               )}
@@ -242,9 +450,82 @@ export default function Products() {
         {/* Product Count */}
         <Box sx={{ mt: 2, textAlign: 'center' }}>
           <Typography variant="body2" color="text.secondary">
-            Showing {products.length} product{products.length !== 1 ? 's' : ''}
+            {searchQuery
+              ? `Showing ${filteredProducts.length} of ${products.length} product${products.length !== 1 ? 's' : ''}`
+              : `Showing ${products.length} product${products.length !== 1 ? 's' : ''}`
+            }
           </Typography>
         </Box>
+
+        {/* Add Product Dialog */}
+        <Dialog
+          open={addDialogOpen}
+          onClose={handleAddCancel}
+          maxWidth="sm"
+          fullWidth
+          TransitionProps={{
+            onEntered: handleDialogEntered
+          }}
+        >
+          <DialogTitle>Add New Product</DialogTitle>
+          <DialogContent>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+              <TextField
+                label="Product Name"
+                value={newProduct.name}
+                onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                inputRef={productNameInputRef}
+                fullWidth
+                required
+              />
+              <TextField
+                label="Price"
+                type="number"
+                value={newProduct.price}
+                onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
+                fullWidth
+                required
+                inputProps={{ min: 0.01, step: 0.01 }}
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleAddCancel} disabled={isAdding}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddSubmit}
+              variant="contained"
+              disabled={isAdding || !newProduct.name || !newProduct.price}
+            >
+              {isAdding ? 'Adding...' : 'Add Product'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={deleteDialogOpen} onClose={handleDeleteCancel}>
+          <DialogTitle>Delete Product</DialogTitle>
+          <DialogContent>
+            <Typography>
+              Are you sure you want to delete <strong>{productToDelete?.name}</strong>?
+              This action cannot be undone.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleDeleteCancel} disabled={isDeleting}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteConfirm}
+              variant="contained"
+              color="error"
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         {/* Snackbar for notifications */}
         <Snackbar

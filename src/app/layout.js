@@ -26,21 +26,31 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }) {
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
+
   return (
     <html lang="en">
       <head>
         {/* Load Clash Display from external source */}
-        <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=clash-display@200,400,700,500,600,300&display=swap" />
+        <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=clash-display@200,500,600,300&display=swap" />
       </head>
       <body className={instrumentSans.variable}>
         <Providers>
-          <GoogleOAuthProvider clientId="808016917743-92ev255tua3s4jcfjadg1bup4muepbot.apps.googleusercontent.com">
+          {googleClientId ? (
+            <GoogleOAuthProvider clientId={googleClientId}>
+              <AppThemeProvider>
+                <ClientLayout>
+                  {children}
+                </ClientLayout>
+              </AppThemeProvider>
+            </GoogleOAuthProvider>
+          ) : (
             <AppThemeProvider>
               <ClientLayout>
                 {children}
               </ClientLayout>
             </AppThemeProvider>
-          </GoogleOAuthProvider>
+          )}
         </Providers>
       </body>
     </html>

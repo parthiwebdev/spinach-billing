@@ -19,6 +19,31 @@ export default function FirebaseInitializer() {
   const dispatch = useDispatch();
   const isAuthenticated = useSelector((state) => state.auth?.user);
 
+  // One-time localStorage cleanup on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const migrationKey = 'firebase_migration_v1';
+        const migrationDone = localStorage.getItem(migrationKey);
+
+        if (!migrationDone) {
+          const persistRoot = localStorage.getItem('persist:root');
+          if (persistRoot) {
+            const parsed = JSON.parse(persistRoot);
+            // Remove old persisted data but keep theme and auth
+            const { theme, auth } = parsed;
+            const cleaned = { theme, auth };
+            localStorage.setItem('persist:root', JSON.stringify(cleaned));
+            localStorage.setItem(migrationKey, 'true');
+            console.log('Cleared old persisted data - now using only Firebase real-time data');
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to clear old persisted data:', error);
+      }
+    }
+  }, []); // Run once on mount
+
   useEffect(() => {
     // Only initialize listeners if user is authenticated
     if (!isAuthenticated) {
@@ -26,24 +51,6 @@ export default function FirebaseInitializer() {
     }
 
     console.log('Initializing Firebase real-time listeners...');
-
-    // Clear old persisted data from localStorage (one-time migration)
-    // This ensures we only use real-time Firebase data
-    if (typeof window !== 'undefined') {
-      try {
-        const persistRoot = localStorage.getItem('persist:root');
-        if (persistRoot) {
-          const parsed = JSON.parse(persistRoot);
-          // Remove old persisted data but keep theme and auth
-          const { theme, auth } = parsed;
-          const cleaned = { theme, auth };
-          localStorage.setItem('persist:root', JSON.stringify(cleaned));
-          console.log('Cleared old persisted data - now using only Firebase real-time data');
-        }
-      } catch (error) {
-        console.warn('Failed to clear old persisted data:', error);
-      }
-    }
 
     // Initialize all Firebase real-time listeners
     dispatch(initializeCustomersListener());

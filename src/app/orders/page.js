@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useRouter } from 'next/navigation';
 import { selectAllCustomers } from '@/store/slices/customersSlice';
@@ -23,11 +23,13 @@ import {
   ToggleButtonGroup,
   ToggleButton,
   Skeleton,
+  InputAdornment,
 } from '@mui/material';
 import {
   Visibility as ViewIcon,
   Edit as EditIcon,
   FilterList as FilterIcon,
+  Search as SearchIcon,
 } from '@mui/icons-material';
 
 export default function Orders() {
@@ -39,13 +41,25 @@ export default function Orders() {
 
   const [selectedDate, setSelectedDate] = useState('');
   const [dateFilter, setDateFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const hasMarkedSeen = useRef(false);
 
   const isLoading = !ordersSynced;
 
-  // Mark orders as seen when admin visits this page
+  // Mark orders as seen when admin visits this page (only once per page visit)
   useEffect(() => {
-    dispatch(markOrdersAsSeen());
-  }, [dispatch, orders.length]);
+    // Reset the flag when component mounts (page visit)
+    hasMarkedSeen.current = false;
+  }, []);
+
+  useEffect(() => {
+    // Mark as seen once when orders are synced and we haven't marked yet
+    if (ordersSynced && !hasMarkedSeen.current) {
+      console.log('Marking orders as seen. Total orders:', orders.length);
+      dispatch(markOrdersAsSeen());
+      hasMarkedSeen.current = true;
+    }
+  }, [dispatch, ordersSynced, orders.length]);
 
   // Create a map for quick customer lookup
   const customerMap = useMemo(() => {
@@ -99,11 +113,12 @@ export default function Orders() {
   const filteredOrders = orders.filter((order) => {
     const orderDate = new Date(order.date);
 
-
+    // Date filtering
     if (dateFilter !== 'all' && dateFilter !== 'custom') {
       const range = getDateRange(dateFilter);
       if (range) {
-        return orderDate >= range.start && orderDate <= range.end;
+        const isInDateRange = orderDate >= range.start && orderDate <= range.end;
+        if (!isInDateRange) return false;
       }
     }
 
@@ -111,7 +126,15 @@ export default function Orders() {
       const selected = new Date(selectedDate);
       const selectedStart = new Date(selected.getFullYear(), selected.getMonth(), selected.getDate());
       const selectedEnd = new Date(selected.getFullYear(), selected.getMonth(), selected.getDate(), 23, 59, 59, 999);
-      return orderDate >= selectedStart && orderDate <= selectedEnd;
+      const isInDateRange = orderDate >= selectedStart && orderDate <= selectedEnd;
+      if (!isInDateRange) return false;
+    }
+
+    // Search filtering
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      const customerName = getCustomerName(order).toLowerCase();
+      return customerName.includes(query);
     }
 
     return true;
@@ -140,6 +163,41 @@ export default function Orders() {
         >
           Order History
         </Typography>
+
+        {/* Search Bar */}
+        <Paper sx={{ p: 2, mb: 2 }}>
+          <TextField
+            fullWidth
+            placeholder="Search orders by customer name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            size="small"
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon color="action" />
+                  </InputAdornment>
+                ),
+              },
+            }}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2
+              }
+            }}
+          />
+          {searchQuery && (
+            <Box sx={{ mt: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="body2" color="text.secondary">
+                Found {filteredOrders.length} order(s)
+              </Typography>
+              <Button size="small" onClick={() => setSearchQuery('')}>
+                Clear
+              </Button>
+            </Box>
+          )}
+        </Paper>
 
         {/* Date Filters */}
         <Paper sx={{ p: { xs: 2, md: 3 }, mb: { xs: 2, md: 3 }, mx: { md: 0 } }}>

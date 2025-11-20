@@ -133,7 +133,16 @@ export default function Settings() {
             <ListItem>
               <ListItemText
                 primary="Developer"
-                secondary="Parthiban R"
+                secondary={
+                  <Box component="span">
+                    <Typography variant="body2" component="span" display="block">
+                      Parthiban R
+                    </Typography>
+                    <Typography variant="body2" component="span" display="block" color="text.secondary">
+                      Phone: +91 6383044009
+                    </Typography>
+                  </Box>
+                }
               />
             </ListItem>
           </List>
